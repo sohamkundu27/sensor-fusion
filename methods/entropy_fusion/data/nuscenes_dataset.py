@@ -3,6 +3,8 @@ from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image
+from pyquaternion import Quaternion
+from nuscenes.utils.geometry_utils import transform_matrix
 from torch.utils.data import Dataset
 from nuscenes.nuscenes import NuScenes
 from nuscenes.utils.data_classes import LidarPointCloud, RadarPointCloud
@@ -133,6 +135,9 @@ class NuScenesFusionDataset(Dataset):
             annotations[-1]['velocity_global'] = velocity.tolist()
             annotations[-1]['velocity_valid'] = bool(np.isfinite(velocity).all())
             annotations[-1]['detection_name'] = name
+            annotations[-1]['attribute_names'] = [self.nusc.get('attribute', t)['name'] for t in ann['attribute_tokens']]
+        pose = self.nusc.get('ego_pose', camera['ego_pose_token'])
+        ego_to_global = transform_matrix(pose['translation'], Quaternion(pose['rotation']))
         return {
             'camera': torch.from_numpy(rgb),
             'lidar': torch.from_numpy(lidar_depth / self.max_depth),
@@ -149,7 +154,7 @@ class NuScenesFusionDataset(Dataset):
                          'camera_timestamp': camera['timestamp'], 'original_hw': (original_h, original_w),
                          'image_hw': self.image_hw, 'intrinsic_original': intrinsic,
                          'intrinsic': affine @ intrinsic, 'pixel_transform': affine,
-                         'global_to_camera': global_to_camera, 'sensors': [lidar_meta, *radar_meta]},
+                         'global_to_camera': global_to_camera, 'ego_to_global': ego_to_global, 'sensors': [lidar_meta, *radar_meta]},
             'projections': {'lidar': torch.from_numpy(lidar), 'radar': torch.from_numpy(radar)}
         }
 
