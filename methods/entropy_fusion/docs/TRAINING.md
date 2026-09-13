@@ -52,6 +52,23 @@ weights, optimizer, scaler, RNG and the position in that epoch's shuffle; keep t
 original batch size, cameras, resolution, split, seed, precision, accumulation,
 LR and dropout settings. Extending `--epochs` or `--max-steps` is supported.
 
+## Scheduled mini experiment
+
+To train for 20 epochs with official validation at epochs 1, 5, 10, 15 and 20:
+
+```bash
+python -m scripts.run_mini_experiment --output outputs/my_mini_run --epochs 20 --validate-every 5
+python -m scripts.summarize_experiment outputs/my_mini_run
+```
+
+The runner starts fresh from ImageNet camera weights and the configured seed,
+resuming optimizer/RNG state between validation stages. It writes stage logs,
+`status.json`, numbered evaluated checkpoints, and `best.pt` selected by validation
+mAP. The second command produces `summary.json` and `learning_curves.png`; it also
+works while training, in which case the latest epoch may be incomplete. Use an
+empty directory for the runner. If the runner fails, preserve its output and use
+`train.py --resume` with `training/last.pt` to continue training explicitly.
+
 ## Precision and accumulation
 
 ```bash
