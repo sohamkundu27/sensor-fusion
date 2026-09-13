@@ -1,39 +1,23 @@
 # sensor-fusion
 
-A workspace for comparing object-detection and sensor-fusion methods on nuScenes
-and Waymo. Each method has its own folder, dependencies, documentation, and experiments.
+A research workspace for comparing object-detection and sensor-fusion methods on autonomous-driving datasets. Each method has its own folder so we can develop and evaluate different approaches in the same repository.
 
-| Method | Folder | Current status |
-| --- | --- | --- |
-| TransFusion | [methods/transfusion](methods/transfusion/README.md) | Environment and CUDA checks verified; upstream model configs available |
-| Entropy-steered camera/LiDAR/radar fusion | [methods/entropy_fusion](methods/entropy_fusion/README.md) | nuScenes-mini data pipeline verified; model implementation pending |
+## Datasets
 
-```text
-methods/
-├── transfusion/
-└── entropy_fusion/
-```
+### nuScenes
 
-Raw datasets are shared outside the repository under `~/data/`. Each method keeps
-its own environment; run commands from the corresponding method directory.
+[nuScenes](https://www.nuscenes.org/) contains 1,000 driving scenes recorded with six cameras, one LiDAR, and five radars, with annotated 3D objects. We use its camera, LiDAR, and radar measurements to explore how complementary sensors can improve object detection. The 10-scene mini split is our starting point for verifying data loading and sensor alignment before moving to the full training and validation splits.
 
-## TransFusion
+### Waymo Open Dataset
 
-```bash
-cd ~/sensor-fusion/methods/transfusion
-source scripts/activate_transfusion.sh
-python scripts/check_environment.py
-```
+The [Waymo Open Dataset Perception dataset](https://waymo.com/open/) provides camera images, LiDAR measurements, and object annotations for autonomous-driving research. We have a small subset of version 1.4.3: five training segments and two validation segments in TFRecord format, totaling approximately 6.4 GiB. This subset supports pipeline testing; it is not a representative evaluation benchmark.
 
-The original TransFusion LICENSE and paper attribution remain in its method folder.
+## Methods
 
-## Entropy-steered fusion
+### TransFusion
 
-```bash
-cd ~/sensor-fusion/methods/entropy_fusion
-source ~/venvs/entropy-fusion/bin/activate
-python -m pytest -q
-python -m scripts.verify_batch --workers 2
-```
+[TransFusion](methods/transfusion/) is a transformer-based approach to LiDAR-camera 3D object detection introduced by Xuyang Bai and colleagues at CVPR 2022. It uses LiDAR features to initialize object queries and camera features to refine detections through attention. We are preparing the [original implementation](https://github.com/XuyangBai/TransFusion) as a baseline, including its LiDAR-only and camera-fusion variants; its environment and initial checks are verified, but training has not started.
 
-These commands verify the existing setup and data pipeline; they do not train models.
+### Entropy-steered multi-modal fusion
+
+Our [entropy-steered fusion method](methods/entropy_fusion/) is inspired by Mario Bijelic and colleagues’ CVPR 2020 paper, [Seeing Through Fog Without Seeing Fog](https://arxiv.org/abs/1902.08913). We plan to combine camera images with LiDAR and radar projected onto the image plane, using local input entropy to guide feature fusion at multiple resolutions. This three-modality adaptation does not use gated NIR cameras; the nuScenes-mini data pipeline is verified, while the model remains to be implemented. Standard nuScenes 3D evaluation will require extending the planned SSD-style head beyond image-plane box predictions.
