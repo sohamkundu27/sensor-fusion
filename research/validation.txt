@@ -1,0 +1,21 @@
+Validated on 2026-09-12, Ubuntu 24.04, NVIDIA driver 580.95.05.
+import DCN failed
+{
+  "python": "3.7.12",
+  "torch": "1.7.0+cu110",
+  "torchvision": "0.8.1+cu110",
+  "cuda": "11.0",
+  "mmcv": "1.2.4",
+  "mmdet": "2.10.0",
+  "mmdet3d": "0.11.0",
+  "numpy": "1.19.5",
+  "numba": "0.48.0",
+  "gpu": "NVIDIA GeForce RTX 3080"
+}
+PASS: imports, both model constructions, CUDA matmul/NMS/voxelization, bundled spconv forward and gradient.
+No dataset was loaded, no full model forward/backward or training was run.
+pip check: No broken requirements found.
+Training CLI and stock data-prep CLI --help: passed.
+Data-prep missing-directory guard: passed on an empty temporary directory.
+LICENSE and all upstream configs: SHA256 matches original snapshot.
+No real-data preparation or training executed.

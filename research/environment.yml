@@ -1,0 +1,14 @@
+name: transfusion
+channels:
+  - conda-forge
+dependencies:
+  - python=3.7.12
+  - pip=23.3.2
+  - setuptools=59.8.0
+  - wheel=0.38.4
+  - gcc_linux-64=9.5.0
+  - gxx_linux-64=9.5.0
+  - sysroot_linux-64=2.17
+  - ninja
+  - cmake<4
+  - libxcrypt
