@@ -1,5 +1,6 @@
 """Train the entropy-gated 3D baseline; supports bounded benchmarks and resume."""
 import argparse
+from collections import deque
 import json
 import random
 import time
@@ -44,13 +45,14 @@ def parse_args():
     parser.add_argument('--amp', action=argparse.BooleanOptionalAction)
     parser.add_argument('--seed', type=int)
     parser.add_argument('--max-steps', type=int, default=0, help='Stop at this absolute microbatch step; 0 runs requested epochs')
+    parser.add_argument('--checkpoint-every', type=int, default=0, help='Save every N microbatches at optimizer boundaries; 0 saves at epoch/stop only')
     parser.add_argument('--output', type=Path, default=Path('outputs/train_mini'))
     parser.add_argument('--resume', type=Path)
     parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--no-pretrained', action='store_true', help='Explicit random-camera ablation; default downloads ImageNet weights')
     parser.set_defaults(**json.loads(Path(known.config).read_text()))
     args = parser.parse_args()
-    if min(args.batch_size, args.epochs, args.accumulation_steps) < 1 or args.workers < 0 or args.max_steps < 0:
+    if min(args.batch_size, args.epochs, args.accumulation_steps) < 1 or args.workers < 0 or args.max_steps < 0 or args.checkpoint_every < 0:
         parser.error('Positive batch/epoch/accumulation values and nonnegative workers/max steps required')
     if args.lr <= 0 or not 0 <= args.modality_dropout <= 1:
         parser.error('Positive LR and dropout in [0, 1] required')
@@ -95,7 +97,10 @@ def main():
     pretrained_camera = checkpoint['pretrained_camera'] if checkpoint else not args.no_pretrained
     (args.output/'config.json').write_text(json.dumps(config, indent=2))
     model.train()
-    rows = []
+    rows = deque(maxlen=1000)
+    run_steps = 0
+    measured_seconds = 0.
+    measured_count = 0
     consecutive_overflows = 0
     parameters = sum(p.numel() for p in model.parameters())
     if device.type == 'cuda':
@@ -174,17 +179,23 @@ def main():
                        peak_allocated_gib=torch.cuda.max_memory_allocated(device)/2**30 if device.type=='cuda' else 0,
                        peak_reserved_gib=torch.cuda.max_memory_reserved(device)/2**30 if device.type=='cuda' else 0)
             rows.append(row)
+            run_steps += 1
+            if run_steps > 2:
+                measured_seconds += row['seconds']
+                measured_count += 1
             print(json.dumps(row), flush=True)
             with (args.output/'metrics.jsonl').open('a') as stream:
                 stream.write(json.dumps(row)+'\n')
+            if args.checkpoint_every and step % args.checkpoint_every == 0 and window == 0:
+                save(epoch+1 if batch_idx+1 == len(loader) else epoch, 0 if batch_idx+1 == len(loader) else batch_idx+1)
             if args.max_steps and step >= args.max_steps:
                 save(epoch+1 if batch_idx+1 == len(loader) else epoch, 0 if batch_idx+1 == len(loader) else batch_idx+1)
                 break
         else:
             save(epoch+1, 0)
-    measured = rows[2:] if len(rows) > 2 else rows
-    summary = dict(steps_completed_this_run=len(rows), total_steps=step, parameters=parameters, dataset_items=len(dataset),
-                   mean_seconds=sum(x['seconds'] for x in measured)/len(measured) if measured else None,
+    measured = list(rows)[2:] if len(rows) > 2 else list(rows)
+    summary = dict(steps_completed_this_run=run_steps, total_steps=step, parameters=parameters, dataset_items=len(dataset),
+                   mean_seconds=measured_seconds/measured_count if measured_count else (sum(x['seconds'] for x in measured)/len(measured) if measured else None),
                    peak_allocated_gib=max((x['peak_allocated_gib'] for x in rows), default=0),
                    peak_reserved_gib=max((x['peak_reserved_gib'] for x in rows), default=0),
                    pretrained_camera=pretrained_camera, checkpoint=str(args.output/'last.pt'), config=config)
