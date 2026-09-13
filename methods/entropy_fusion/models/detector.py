@@ -29,5 +29,8 @@ class EntropyFusionDetector(nn.Module):
         streams = [net(x) for net, x in zip((self.camera, self.lidar, self.radar), inputs)]
         fused = [exchange(features, entropies, available) for exchange, features in zip(self.exchange, zip(*streams))]
         result = self.head(fused, inputs[0].shape[-2:])
+        center = (result['anchors'][:, :2] + result['anchors'][:, 2:]) / 2
+        h, w = inputs[0].shape[-2:]
+        result['valid_anchors'] = batch['camera_mask'][:, 0, center[:, 1].long().clamp(0, h-1), center[:, 0].long().clamp(0, w-1)]
         result['available'] = available
         return result
