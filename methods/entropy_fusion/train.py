@@ -70,6 +70,8 @@ def main():
     config = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}
     checkpoint = torch.load(args.resume, map_location='cpu', weights_only=False) if args.resume else None
     if checkpoint:
+        if checkpoint.get('format_version') != 1:
+            raise ValueError('Checkpoint predates the camera-relative 3D encoding')
         for key in ('version', 'split', 'cameras', 'image_hw', 'batch_size', 'lr', 'amp', 'seed', 'accumulation_steps', 'modality_dropout'):
             if checkpoint['config'][key] != config[key]:
                 raise ValueError(f'Resume setting differs: {key}. Use the original training settings.')
@@ -101,7 +103,7 @@ def main():
         if device.type == 'cuda':
             torch.cuda.synchronize(device)
     def save(epoch, batch_cursor):
-        payload = dict(model=model.state_dict(), optimizer=optimizer.state_dict(), scaler=scaler.state_dict(),
+        payload = dict(format_version=1, model=model.state_dict(), optimizer=optimizer.state_dict(), scaler=scaler.state_dict(),
                        config=config, epoch=epoch, batch_cursor=batch_cursor, step=step,
                        pretrained_camera=pretrained_camera, rng_python=random.getstate(), rng_numpy=np.random.get_state(),
                        rng_torch=torch.get_rng_state(), rng_cuda=torch.cuda.get_rng_state_all() if device.type == 'cuda' else [])

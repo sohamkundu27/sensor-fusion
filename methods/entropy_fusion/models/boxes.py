@@ -25,11 +25,19 @@ def decode_boxes(code, anchors):
     return torch.cat((center-size/2, center+size/2), 1)
 
 
+def camera_heading(metadata):
+    c2g = np.linalg.inv(metadata['global_to_camera'])
+    c2e_rotation = np.asarray(metadata['ego_to_global'])[:3, :3].T @ c2g[:3, :3]
+    return np.arctan2(c2e_rotation[1, 2], c2e_rotation[0, 2])
+
+
 def prepare_targets(target, metadata, device):
-    """Convert global annotations to camera center/ray and camera-time ego yaw/velocity."""
+    """Convert global annotations to camera ray and heading-relative yaw/velocity."""
     g2c = np.asarray(metadata['global_to_camera'])
     e2g = np.asarray(metadata['ego_to_global'])
     intrinsic = np.asarray(metadata['intrinsic'])
+    heading = camera_heading(metadata)
+    rotation_to_view = np.array([[np.cos(heading), np.sin(heading)], [-np.sin(heading), np.cos(heading)]])
     keep, values, velocity_valid, attributes = [], [], [], []
     for i, ann in enumerate(target['annotations_3d']):
         center = g2c[:3, :3] @ np.asarray(ann['translation']) + g2c[:3, 3]
@@ -40,10 +48,10 @@ def prepare_targets(target, metadata, device):
         uv = intrinsic @ center
         uv = uv[:2] / uv[2]
         local_rotation = e2g[:3, :3].T @ Quaternion(ann['rotation']).rotation_matrix
-        yaw = np.arctan2(local_rotation[1, 0], local_rotation[0, 0])
+        yaw = np.arctan2(local_rotation[1, 0], local_rotation[0, 0]) - heading
         valid = ann['velocity_valid']
         velocity = e2g[:3, :3].T @ np.asarray(ann['velocity_global']) if valid else np.zeros(3)
-        values.append([*uv, np.log(center[2]), *np.log(ann['size']), np.sin(yaw), np.cos(yaw), *(velocity[:2]/10)])
+        values.append([*uv, np.log(center[2]), *np.log(ann['size']), np.sin(yaw), np.cos(yaw), *(rotation_to_view @ velocity[:2]/10)])
         keep.append(i)
         velocity_valid.append(valid)
         names = ann.get('attribute_names', [])
@@ -72,8 +80,11 @@ def decode_3d(code, anchors, metadata):
     camera_xyz = rays * depth[:, None]
     xyz = camera_xyz @ c2g[:3, :3].T + c2g[:3, 3]
     size = code[:, 3:6].clamp(np.log(.1), np.log(30)).exp()
-    yaw = torch.atan2(code[:, 6], code[:, 7])
-    local_velocity = torch.cat((code[:, 8:10] * 10, torch.zeros_like(code[:, :1])), 1)
+    heading = float(camera_heading(metadata))
+    yaw = torch.atan2(code[:, 6], code[:, 7]) + heading
+    rotation_to_ego = code.new_tensor([[np.cos(heading), -np.sin(heading)], [np.sin(heading), np.cos(heading)]])
+    ego_xy = (code[:, 8:10]*10) @ rotation_to_ego.T
+    local_velocity = torch.cat((ego_xy, torch.zeros_like(code[:, :1])), 1)
     velocity = (local_velocity @ e2g[:3, :3].T)[:, :2]
     # Upright boxes in the local ego frame, transformed using its full rotation.
     rotations = [(Quaternion(matrix=np.asarray(metadata['ego_to_global'])[:3, :3]) *

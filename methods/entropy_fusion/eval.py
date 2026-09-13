@@ -30,6 +30,8 @@ def main():
     torch.set_num_threads(8)
     device = torch.device(args.device)
     checkpoint = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
+    if checkpoint.get('format_version') != 1:
+        raise ValueError('Checkpoint predates the camera-relative 3D encoding')
     config = checkpoint['config']
     model = EntropyFusionDetector(pretrained=False, modality_dropout=config['modality_dropout']).to(device)
     model.load_state_dict(checkpoint['model'])

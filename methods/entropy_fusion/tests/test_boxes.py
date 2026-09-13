@@ -9,7 +9,7 @@ def test_metric_box_roundtrip_with_rotated_translated_camera():
     e2g[:3, :3] = Quaternion(axis=[0, 0, 1], radians=.8).rotation_matrix
     e2g[:3, 3] = [100, -20, 2]
     c2e = np.eye(4)
-    c2e[:3, :3] = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
+    c2e[:3, :3] = Quaternion(axis=[0, 0, 1], radians=.6).rotation_matrix @ np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
     c2e[:3, 3] = [1, .2, 1.5]
     c2g = e2g @ c2e
     center = c2g[:3, :3] @ np.array([2., 1., 20.]) + c2g[:3, 3]
