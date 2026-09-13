@@ -10,4 +10,4 @@ dist/
 *.pth
 *.pt
 /datasets/
-/outputs/
+outputs/

@@ -27,7 +27,7 @@ Upstream model configs remain unchanged. See:
 - [nuScenes preparation and launch checklist](docs/NUSCENES_READY.md)
 - [Existing dataset notes (Waymo and nuScenes mini)](docs/WAYMO_SUBSET.md)
 
-The active checkout is `~/sensor-fusion/legacy/transfusion`, the isolated environment is
+The active checkout is `~/sensor-fusion/methods/transfusion`, the isolated environment is
 `~/venvs/transfusion`, and `data/nuscenes` links to `~/data/nuscenes` locally.
 Datasets, checkpoints, compiled binaries, and environments are not committed.
 Old upstream CI/release workflows are archived under `docs/upstream-workflows/`;
