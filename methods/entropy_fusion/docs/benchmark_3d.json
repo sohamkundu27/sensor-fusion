@@ -1,0 +1,94 @@
+{
+  "date": "2026-09-13",
+  "checkpoint_format": 1,
+  "gpu": "RTX 3080 12 GB",
+  "training": {
+    "steps_completed_this_run": 12,
+    "total_steps": 12,
+    "parameters": 13205670,
+    "dataset_items": 1938,
+    "mean_seconds": 0.04089185632765293,
+    "peak_allocated_gib": 0.34116125106811523,
+    "peak_reserved_gib": 0.388671875,
+    "pretrained_camera": true,
+    "checkpoint": "outputs/benchmark_3d/last.pt",
+    "config": {
+      "config": "/home/soham/sensor-fusion/methods/entropy_fusion/configs/mini.json",
+      "root": "/home/soham/data/nuscenes",
+      "version": "v1.0-mini",
+      "split": "mini_train",
+      "cameras": [
+        "CAM_FRONT",
+        "CAM_FRONT_LEFT",
+        "CAM_FRONT_RIGHT",
+        "CAM_BACK",
+        "CAM_BACK_LEFT",
+        "CAM_BACK_RIGHT"
+      ],
+      "image_hw": [
+        384,
+        640
+      ],
+      "batch_size": 1,
+      "workers": 2,
+      "epochs": 20,
+      "lr": 0.0001,
+      "modality_dropout": 0.5,
+      "accumulation_steps": 1,
+      "amp": false,
+      "seed": 42,
+      "max_steps": 12,
+      "output": "outputs/benchmark_3d",
+      "resume": null,
+      "device": "cuda",
+      "no_pretrained": false
+    }
+  },
+  "evaluation": {
+    "complete": true,
+    "processed_views": 486,
+    "total_views": 486,
+    "sample_tokens": 81,
+    "prediction_count": 29140,
+    "checkpoint": "/home/soham/sensor-fusion/methods/entropy_fusion/outputs/benchmark_3d/last.pt",
+    "checkpoint_step": 12,
+    "score_threshold": 0.05,
+    "topk_per_view": 100,
+    "split": "mini_val",
+    "mAP": 0.0007395585885819854,
+    "NDS": 0.007258484558694841
+  },
+  "learning": {
+    "status": "PASS",
+    "steps": 40,
+    "first_five_mean_loss": 8.718505096435546,
+    "last_five_mean_loss": 1.0560838341712953,
+    "initial_gradient_l1": {
+      "camera": 4005.249066852033,
+      "lidar": 910.6471848934889,
+      "radar": 1448.2230301098898,
+      "exchange": 9692.523053448414,
+      "head": 15075.966753810644,
+      "gate_0_0": 7.000278472900391,
+      "gate_0_1": 0.5427430868148804,
+      "gate_0_2": 1.4460418224334717,
+      "gate_1_0": 2.137880325317383,
+      "gate_1_1": 0.24978378415107727,
+      "gate_1_2": 0.15021231770515442,
+      "gate_2_0": 0.6577580571174622,
+      "gate_2_1": 0.007246225140988827,
+      "gate_2_2": 0.001079806825146079
+    },
+    "note": "One repeated training view, dropout disabled; checks learning mechanics only. Weights discarded."
+  },
+  "amp_accumulation": {
+    "microbatches": 5,
+    "optimizer_updates": 3,
+    "skipped_updates": 0,
+    "scale": 1024
+  },
+  "resume": {
+    "total_microbatches": 7,
+    "total_optimizer_updates": 4
+  }
+}

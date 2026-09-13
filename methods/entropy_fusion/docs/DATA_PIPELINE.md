@@ -88,3 +88,7 @@ nearest-depth collisions, empty sensors, and near-plane box clipping.
 Reports/overlays stay in ignored `outputs/`; no dataset files are copied or changed.
 A passing batch is a geometry/data-loading smoke test, not detection accuracy or
 a guarantee that the full dataset has finished downloading.
+
+The implemented model now consumes these fields. Camera metadata also includes
+`ego_to_global` at camera time; annotations include attribute names resolved by the
+devkit. Metric target encoding and masking are described in [the model notes](MODEL_PLAN.md).
