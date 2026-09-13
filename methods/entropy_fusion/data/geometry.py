@@ -16,6 +16,14 @@ def transform_points(xyz, matrix):
     return xyz @ matrix[:3, :3].T + matrix[:3, 3]
 
 
+def filter_visible_points(uvd, image_hw):
+    """Recheck representable coordinates after projection casts or image resizing."""
+    h, w = image_hw
+    valid = np.isfinite(uvd).all(axis=1) & (uvd[:, 2] > 0)
+    valid &= (uvd[:, 0] >= 0) & (uvd[:, 0] < w) & (uvd[:, 1] >= 0) & (uvd[:, 1] < h)
+    return uvd[valid]
+
+
 def project_points(xyz_camera, intrinsic, image_hw, min_depth=1.0, max_depth=100.0):
     """Return visible (u, v, camera-Z metres); camera axes are right/down/forward."""
     h, w = image_hw
@@ -25,7 +33,8 @@ def project_points(xyz_camera, intrinsic, image_hw, min_depth=1.0, max_depth=100
     projected = xyz @ intrinsic.T
     uv = projected[:, :2] / projected[:, 2:3]
     inside = (uv[:, 0] >= 0) & (uv[:, 0] < w) & (uv[:, 1] >= 0) & (uv[:, 1] < h)
-    return np.column_stack((uv[inside], xyz[inside, 2])).astype(np.float32)
+    result = np.column_stack((uv[inside], xyz[inside, 2])).astype(np.float32)
+    return filter_visible_points(result, image_hw)
 
 
 def rasterize_depth(uvd, image_hw):

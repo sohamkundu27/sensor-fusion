@@ -10,7 +10,7 @@ from nuscenes.nuscenes import NuScenes
 from nuscenes.utils.data_classes import LidarPointCloud, RadarPointCloud
 from nuscenes.utils.splits import create_splits_scenes
 from nuscenes.eval.detection.utils import category_to_detection_name
-from .geometry import sensor_to_global, transform_points, project_points, rasterize_depth, project_box
+from .geometry import sensor_to_global, transform_points, project_points, rasterize_depth, project_box, filter_visible_points
 
 CAMERAS = ('CAM_FRONT', 'CAM_FRONT_LEFT', 'CAM_FRONT_RIGHT', 'CAM_BACK', 'CAM_BACK_LEFT', 'CAM_BACK_RIGHT')
 RADARS = ('RADAR_FRONT', 'RADAR_FRONT_LEFT', 'RADAR_FRONT_RIGHT', 'RADAR_BACK_LEFT', 'RADAR_BACK_RIGHT')
@@ -62,7 +62,7 @@ class NuScenesFusionDataset(Dataset):
             raise FileNotFoundError(f'Missing {path}. Finish extracting the requested dataset split.')
         return path
 
-    def _project_sensor(self, token, camera_record, intrinsic, original_hw, pixel_transform):
+    def _project_sensor(self, token, camera_record, intrinsic, original_hw, pixel_transform, output_hw=None):
         record = self.nusc.get('sample_data', token)
         calibration = self.nusc.get('calibrated_sensor', record['calibrated_sensor_token'])
         sensor = self.nusc.get('sensor', calibration['sensor_token'])
@@ -79,6 +79,7 @@ class NuScenesFusionDataset(Dataset):
         if len(uvd):
             homogeneous = np.column_stack((uvd[:, :2], np.ones(len(uvd))))
             uvd[:, :2] = (homogeneous @ pixel_transform.T)[:, :2]
+        uvd = filter_visible_points(uvd, original_hw if output_hw is None else output_hw)
         return uvd, {'channel': sensor['channel'], 'token': token,
                      'time_offset_seconds': (record['timestamp'] - camera_record['timestamp']) / 1e6,
                      'sensor_to_camera': transform, 'input_points': cloud.nbr_points(),
@@ -103,7 +104,7 @@ class NuScenesFusionDataset(Dataset):
         image_mask = np.zeros((1, h, w), dtype=bool)
         image_mask[:, top:top + resized_h, left:left + resized_w] = True
         affine = np.array([[resized_w / original_w, 0, left], [0, resized_h / original_h, top], [0, 0, 1.]])
-        kwargs = (camera, intrinsic, (original_h, original_w), affine)
+        kwargs = (camera, intrinsic, (original_h, original_w), affine, self.image_hw)
         lidar, lidar_meta = self._project_sensor(sample['data']['LIDAR_TOP'], *kwargs)
         radar_points, radar_meta = [], []
         for radar in RADARS:

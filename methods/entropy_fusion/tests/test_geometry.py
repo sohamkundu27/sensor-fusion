@@ -43,3 +43,23 @@ def test_box_clipping_handles_near_plane_and_behind_camera():
     assert project_box(behind.corners(), k, (64, 64)) is None
     crossing = Box([0, 0, 0.2], [2, 2, 2], Quaternion())
     np.testing.assert_allclose(project_box(crossing.corners(), k, (64, 64)), [0, 0, 64, 64])
+
+
+def test_float32_projection_rounding_cannot_escape_image():
+    from data.geometry import filter_visible_points
+    # Float64 is in frame, but float32 rounds it to the exclusive right/bottom boundary.
+    xyz = np.array([[1599.99999, 100., 1.], [100., 899.99999, 1.], [1599., 899., 1.]]) * 10
+    projected = project_points(xyz, np.eye(3), (900, 1600))
+    assert projected.shape == (1, 3)
+    # A valid source coordinate can round to 640 during the final float32 resize.
+    source = np.array([[np.nextafter(np.float32(1600), np.float32(0)), 440.4313, 8.293341],
+                       [100., 100., 5.]], dtype=np.float32)
+    transformed = source.copy()
+    transformed[:, :2] = (np.column_stack((source[:, :2], np.ones(2))) @
+                           np.array([[.4, 0, 0], [0, .4, 12], [0, 0, 1.]]).T)[:, :2]
+    # Also cover the exact observed coordinate from the failing training sample.
+    transformed = np.vstack((transformed, [[640., 188.17252, 8.293341], [10., 384., 3.]]))
+    visible = filter_visible_points(transformed, (384, 640))
+    assert (visible[:, 0] < 640).all() and (visible[:, 1] < 384).all()
+    depth, mask = rasterize_depth(visible, (384, 640))
+    assert mask.any() and np.isfinite(depth).all()
