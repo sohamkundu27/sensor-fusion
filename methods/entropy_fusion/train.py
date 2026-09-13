@@ -80,7 +80,7 @@ def main():
     model = EntropyFusionDetector(pretrained=not args.no_pretrained and checkpoint is None,
                                   modality_dropout=args.modality_dropout).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=.01)
-    scaler = torch.amp.GradScaler('cuda', enabled=args.amp)
+    scaler = torch.amp.GradScaler('cuda', enabled=args.amp, init_scale=1024.)
     step, start_epoch, cursor = 0, 0, 0
     if checkpoint:
         model.load_state_dict(checkpoint['model'])
@@ -96,6 +96,7 @@ def main():
     (args.output/'config.json').write_text(json.dumps(config, indent=2))
     model.train()
     rows = []
+    consecutive_overflows = 0
     parameters = sum(p.numel() for p in model.parameters())
     if device.type == 'cuda':
         torch.cuda.reset_peak_memory_stats(device)
@@ -141,9 +142,24 @@ def main():
             scaler.scale(losses['total']/window_size).backward()
             window += 1
             gradient_norm = None
+            skipped_optimizer_step = False
             if window == window_size:
                 scaler.unscale_(optimizer)
-                gradient_norm = float(torch.nn.utils.clip_grad_norm_(model.parameters(), 10., error_if_nonfinite=True))
+                gradients = [p.grad for p in model.parameters() if p.grad is not None]
+                norm = torch.linalg.vector_norm(torch.stack([torch.linalg.vector_norm(g.float()) for g in gradients]))
+                if torch.isfinite(norm):
+                    gradient_norm = float(norm)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 10., error_if_nonfinite=True)
+                    consecutive_overflows = 0
+                elif args.amp:
+                    # GradScaler recorded overflow during unscale: step skips the update.
+                    skipped_optimizer_step = True
+                    consecutive_overflows += 1
+                    if consecutive_overflows > 10:
+                        raise FloatingPointError('Repeated AMP overflow; use FP32 or inspect the losses')
+                else:
+                    raise FloatingPointError('Nonfinite gradients')
+                del gradients, norm
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad(set_to_none=True)
@@ -152,7 +168,7 @@ def main():
             ended = time.perf_counter()
             step += 1
             row = dict(step=step, epoch=epoch+1, data_seconds=loaded-started, compute_seconds=ended-loaded,
-                       seconds=ended-started, gradient_norm=gradient_norm,
+                       seconds=ended-started, gradient_norm=gradient_norm, skipped_optimizer_step=skipped_optimizer_step,
                        losses={k: float(v.detach()) if torch.is_tensor(v) else v for k,v in losses.items()},
                        active_modalities=pred['available'].sum(0).tolist(),
                        peak_allocated_gib=torch.cuda.max_memory_allocated(device)/2**30 if device.type=='cuda' else 0,
