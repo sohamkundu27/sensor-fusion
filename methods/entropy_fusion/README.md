@@ -16,8 +16,9 @@ modality dropout encourages the detector to use complementary inputs.
 The project supports training checkpoints, resume, mixed precision, gradient
 accumulation, and official nuScenes 3D evaluation after merging detections from
 all six camera views. Development uses the ten-scene nuScenes-mini split; raw
-data and checkpoints remain outside Git. This is an initial research baseline,
-not an accuracy-validated detector or a demonstrated adverse-weather solution.
+data and checkpoints remain outside Git. A [20-epoch mini experiment](docs/MINI_EXPERIMENT.md) completed successfully,
+with 4.76% validation mAP. Held-out accuracy remains low, and adverse-weather
+robustness has not been established.
 
 See the [architecture and design choices](docs/MODEL_PLAN.md),
 [data contract](docs/DATA_PIPELINE.md), [training instructions](docs/TRAINING.md),

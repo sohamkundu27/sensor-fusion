@@ -1,7 +1,7 @@
 # 3D implementation checks — September 13, 2026
 
 The entropy-fusion model, training losses, checkpoint/resume path and official
-nuScenes evaluator are implemented. The earlier data-only milestone is complete.
+nuScenes evaluator are implemented. The earlier data-only milestone is complete. The later [20-epoch mini experiment](MINI_EXPERIMENT.md) records sustained training and validation results; the measurements below describe the initial short checks.
 
 ## Measured FP32 benchmark
 

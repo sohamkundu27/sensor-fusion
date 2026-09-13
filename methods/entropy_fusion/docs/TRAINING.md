@@ -24,6 +24,10 @@ ablation. Generated predictions, logs, reports and checkpoints stay in ignored
 `outputs/`. Choose a new output directory for each experiment; existing checkpoints
 are protected from accidental replacement without `--resume`.
 
+The completed 20-epoch experiment is `outputs/mini_20epoch_20260913/`, with its
+selected checkpoint at `best.pt`. See [the experiment report](MINI_EXPERIMENT.md)
+for validation results and learning curves.
+
 The verified benchmark from setup is `outputs/benchmark_3d/last.pt`, with evaluation
 under `outputs/eval_3d/`. It has only 12 updates and is not a useful detector yet.
 Earlier `benchmark_fp32` artifacts predate the final coordinate encoding and are

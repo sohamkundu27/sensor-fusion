@@ -1,0 +1,426 @@
+{
+  "state": "completed",
+  "training_commit": "6700046a6b8fd922d434d729e02e3c54c4322419",
+  "started_utc": "2026-09-13T18:56:38.940239+00:00",
+  "finished_utc": "2026-09-13T19:28:19.845302+00:00",
+  "elapsed_seconds": 1900.90406123735,
+  "total_steps": 38760,
+  "epochs": [
+    {
+      "epoch": 1,
+      "steps": 1938,
+      "mean_loss": 4.554174657345925,
+      "mean_seconds": 0.03997400235211702,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 3.162583488567326,
+        "boxes": 0.10375998660338652,
+        "boxes3d": 1.0683412673441988,
+        "attributes": 1.097449592161843
+      }
+    },
+    {
+      "epoch": 2,
+      "steps": 1938,
+      "mean_loss": 3.764726591583868,
+      "mean_seconds": 0.04174962442779627,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 2.7079624016033974,
+        "boxes": 0.07775166626789336,
+        "boxes3d": 0.7974839947725597,
+        "attributes": 0.9076426390258613
+      }
+    },
+    {
+      "epoch": 3,
+      "steps": 1938,
+      "mean_loss": 3.342680631003605,
+      "mean_seconds": 0.04367393553852881,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 2.4167044285427246,
+        "boxes": 0.06936502533614486,
+        "boxes3d": 0.7002100949709076,
+        "attributes": 0.7820054047449777
+      }
+    },
+    {
+      "epoch": 4,
+      "steps": 1938,
+      "mean_loss": 2.9864967241767943,
+      "mean_seconds": 0.04252947815016327,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 2.1647583500235137,
+        "boxes": 0.06310475658987225,
+        "boxes3d": 0.6243417188832757,
+        "attributes": 0.6714594926746607
+      }
+    },
+    {
+      "epoch": 5,
+      "steps": 1938,
+      "mean_loss": 2.7655358470522704,
+      "mean_seconds": 0.0426393856695239,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 1.9942566108485247,
+        "boxes": 0.05989813404032813,
+        "boxes3d": 0.5891830133297264,
+        "attributes": 0.6109904424528619
+      }
+    },
+    {
+      "epoch": 6,
+      "steps": 1938,
+      "mean_loss": 2.5098886215757537,
+      "mean_seconds": 0.042329511018921656,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 1.810993001326319,
+        "boxes": 0.054614476151346306,
+        "boxes3d": 0.5379307370381075,
+        "attributes": 0.5317520247570502
+      }
+    },
+    {
+      "epoch": 7,
+      "steps": 1938,
+      "mean_loss": 2.3468073388480875,
+      "mean_seconds": 0.04201601974289361,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 1.6907127950430854,
+        "boxes": 0.051727523508465344,
+        "boxes3d": 0.5058332320261397,
+        "attributes": 0.49266893047826427
+      }
+    },
+    {
+      "epoch": 8,
+      "steps": 1938,
+      "mean_loss": 2.15195904515676,
+      "mean_seconds": 0.044325548153028464,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 1.5322920756512566,
+        "boxes": 0.049915556359668024,
+        "boxes3d": 0.4784097948368212,
+        "attributes": 0.45670807856602175
+      }
+    },
+    {
+      "epoch": 9,
+      "steps": 1938,
+      "mean_loss": 2.005414238861321,
+      "mean_seconds": 0.04486988270626441,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 1.4200959918108433,
+        "boxes": 0.04705485569996042,
+        "boxes3d": 0.4525607463651912,
+        "attributes": 0.428513214338121
+      }
+    },
+    {
+      "epoch": 10,
+      "steps": 1938,
+      "mean_loss": 1.882019301831013,
+      "mean_seconds": 0.04383254711784353,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 1.323511569797022,
+        "boxes": 0.045593611590447836,
+        "boxes3d": 0.4354942873167403,
+        "attributes": 0.38709919564512446
+      }
+    },
+    {
+      "epoch": 11,
+      "steps": 1938,
+      "mean_loss": 1.730001145218964,
+      "mean_seconds": 0.044422979090820276,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 1.206074864318728,
+        "boxes": 0.04301491804791939,
+        "boxes3d": 0.41097219426605863,
+        "attributes": 0.34969584940549686
+      }
+    },
+    {
+      "epoch": 12,
+      "steps": 1938,
+      "mean_loss": 1.669981610251113,
+      "mean_seconds": 0.04241527621302719,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 1.1591120002190827,
+        "boxes": 0.04299571510841416,
+        "boxes3d": 0.4003643116176559,
+        "attributes": 0.3375479296640079
+      }
+    },
+    {
+      "epoch": 13,
+      "steps": 1938,
+      "mean_loss": 1.5391740702160888,
+      "mean_seconds": 0.03991067818759088,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 1.0576397502939991,
+        "boxes": 0.041119371673238335,
+        "boxes3d": 0.38068013741337803,
+        "attributes": 0.2986740513030854
+      }
+    },
+    {
+      "epoch": 14,
+      "steps": 1938,
+      "mean_loss": 1.4529172052555765,
+      "mean_seconds": 0.04287717156054527,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 0.9985088232832108,
+        "boxes": 0.03919955796430102,
+        "boxes3d": 0.3553985507139538,
+        "attributes": 0.29905136755778877
+      }
+    },
+    {
+      "epoch": 15,
+      "steps": 1938,
+      "mean_loss": 1.416744684475648,
+      "mean_seconds": 0.042765632870542684,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 0.9667518409305436,
+        "boxes": 0.0385277389003405,
+        "boxes3d": 0.3562149336860468,
+        "attributes": 0.27625085500863567
+      }
+    },
+    {
+      "epoch": 16,
+      "steps": 1938,
+      "mean_loss": 1.370477199831065,
+      "mean_seconds": 0.042139276288357494,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 0.9349736330944346,
+        "boxes": 0.038213239402269464,
+        "boxes3d": 0.3427857523128079,
+        "attributes": 0.2725228713596179
+      }
+    },
+    {
+      "epoch": 17,
+      "steps": 1938,
+      "mean_loss": 1.3030801687721318,
+      "mean_seconds": 0.041255259873889484,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 0.8820479778836383,
+        "boxes": 0.0372031630858802,
+        "boxes3d": 0.3329290597475162,
+        "attributes": 0.25449984936788694
+      }
+    },
+    {
+      "epoch": 18,
+      "steps": 1938,
+      "mean_loss": 1.1818910336618513,
+      "mean_seconds": 0.04309001421484754,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 0.7876538812289228,
+        "boxes": 0.03571422892017506,
+        "boxes3d": 0.3131719849403261,
+        "attributes": 0.22675470106623383
+      }
+    },
+    {
+      "epoch": 19,
+      "steps": 1938,
+      "mean_loss": 1.187170035997652,
+      "mean_seconds": 0.044619156371598336,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 0.8013474792236344,
+        "boxes": 0.03609960750582742,
+        "boxes3d": 0.3053592788637015,
+        "attributes": 0.22181833302570636
+      }
+    },
+    {
+      "epoch": 20,
+      "steps": 1938,
+      "mean_loss": 1.1243345471457276,
+      "mean_seconds": 0.04344859717546417,
+      "empty_target_fraction": 0.12487100103199174,
+      "skipped_updates": 0,
+      "loss_components": {
+        "logits": 0.7544108940699542,
+        "boxes": 0.03376979441378387,
+        "boxes3d": 0.2927578328628097,
+        "attributes": 0.21698010916465685
+      }
+    }
+  ],
+  "validation": [
+    {
+      "epoch": 1,
+      "mAP": 0.022710940139655966,
+      "NDS": 0.04156849368720084,
+      "checkpoint": "outputs/mini_20epoch_20260913/epoch_01.pt",
+      "per_class_AP": {
+        "car": 0.06340146181310463,
+        "truck": 0.0,
+        "bus": 0.0,
+        "trailer": 0.0,
+        "construction_vehicle": 0.0,
+        "pedestrian": 0.0009445816041090927,
+        "motorcycle": 0.0,
+        "bicycle": 0.0,
+        "traffic_cone": 0.16276335797934594,
+        "barrier": 0.0
+      }
+    },
+    {
+      "epoch": 5,
+      "mAP": 0.04478961952990817,
+      "NDS": 0.08439439824072646,
+      "checkpoint": "outputs/mini_20epoch_20260913/epoch_05.pt",
+      "per_class_AP": {
+        "car": 0.14338332005177395,
+        "truck": 0.006813535619736959,
+        "bus": 0.0,
+        "trailer": 0.0,
+        "construction_vehicle": 0.0,
+        "pedestrian": 0.07307431213575377,
+        "motorcycle": 0.0,
+        "bicycle": 0.0,
+        "traffic_cone": 0.224625027491817,
+        "barrier": 0.0
+      }
+    },
+    {
+      "epoch": 10,
+      "mAP": 0.037323834760304896,
+      "NDS": 0.083284822584886,
+      "checkpoint": "outputs/mini_20epoch_20260913/epoch_10.pt",
+      "per_class_AP": {
+        "car": 0.15956395291420555,
+        "truck": 0.022318974525887866,
+        "bus": 0.013432890766078684,
+        "trailer": 0.0,
+        "construction_vehicle": 0.0,
+        "pedestrian": 0.05657203386996199,
+        "motorcycle": 0.0,
+        "bicycle": 0.0,
+        "traffic_cone": 0.12135049552691486,
+        "barrier": 0.0
+      }
+    },
+    {
+      "epoch": 15,
+      "mAP": 0.04253647027636838,
+      "NDS": 0.09046307589613539,
+      "checkpoint": "outputs/mini_20epoch_20260913/epoch_15.pt",
+      "per_class_AP": {
+        "car": 0.14820100719861015,
+        "truck": 0.028862653663095112,
+        "bus": 0.01448082943771611,
+        "trailer": 0.0,
+        "construction_vehicle": 0.0,
+        "pedestrian": 0.07538083676247717,
+        "motorcycle": 0.0,
+        "bicycle": 0.0,
+        "traffic_cone": 0.1584393757017853,
+        "barrier": 0.0
+      }
+    },
+    {
+      "epoch": 20,
+      "mAP": 0.047590587839934584,
+      "NDS": 0.08328774002663444,
+      "checkpoint": "outputs/mini_20epoch_20260913/epoch_20.pt",
+      "per_class_AP": {
+        "car": 0.12452897566922376,
+        "truck": 0.008165159835248709,
+        "bus": 7.746987832526473e-06,
+        "trailer": 0.0,
+        "construction_vehicle": 0.0,
+        "pedestrian": 0.098795610635005,
+        "motorcycle": 0.0,
+        "bicycle": 0.0,
+        "traffic_cone": 0.2444083852720359,
+        "barrier": 0.0
+      }
+    }
+  ],
+  "best_epoch": 20,
+  "best_mAP": 0.047590587839934584,
+  "peak_allocated_gib": 0.3678450584411621,
+  "peak_reserved_gib": 0.4140625,
+  "checkpoint_verification": {
+    "training/last.pt": {
+      "epoch": 20,
+      "step": 38760,
+      "finite_weights": true,
+      "optimizer_steps_verified": true
+    },
+    "best.pt": {
+      "epoch": 20,
+      "step": 38760,
+      "finite_weights": true,
+      "optimizer_steps_verified": true
+    }
+  },
+  "class_counts": {
+    "counts": {
+      "mini_train": {
+        "pedestrian": 3068,
+        "car": 4082,
+        "traffic_cone": 773,
+        "bicycle": 147,
+        "barrier": 1851,
+        "truck": 451,
+        "bus": 337,
+        "construction_vehicle": 174,
+        "motorcycle": 179,
+        "trailer": 59
+      },
+      "mini_val": {
+        "pedestrian": 1260,
+        "car": 2056,
+        "truck": 122,
+        "traffic_cone": 37,
+        "motorcycle": 233,
+        "bicycle": 44,
+        "bus": 41
+      }
+    },
+    "note": "Keyframe annotations with at least one LiDAR/radar point; no class-range or bike-rack filtering. Counts are not per-camera duplicates."
+  }
+}
