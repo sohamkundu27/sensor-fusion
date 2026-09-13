@@ -1,0 +1,49 @@
+import json
+import sys
+
+import pytest
+import torch
+from scripts import run_full_experiment as runner
+
+
+def test_resume_preserves_history_and_rolls_back_metrics(tmp_path, monkeypatch):
+    output = tmp_path/'run'
+    training = output/'training'
+    training.mkdir(parents=True)
+    root = tmp_path/'data'
+    checkpoint = dict(config=dict(version='v1.0-trainval', root=str(root)),
+                      step=2, epoch=0, batch_cursor=2)
+    torch.save(checkpoint, training/'last.pt')
+    (output/'status.json').write_text(json.dumps(dict(pid=123, epochs=1,
+        state='failed', error='old error', validation=[], elapsed_seconds=12)))
+    original = ''.join(json.dumps(dict(step=i))+'\n' for i in (1, 2, 3))
+    (training/'metrics.jsonl').write_text(original)
+    log = output/'train_to_epoch_01.log'
+    log.write_text('original failure\n')
+    monkeypatch.setattr(sys, 'argv', ['runner', '--resume', '--output', str(output),
+        '--root', str(root), '--epochs', '1'])
+    def dead_pid(*args):
+        raise ProcessLookupError
+    monkeypatch.setattr(runner.os, 'kill', dead_pid)
+    monkeypatch.setattr(runner.subprocess, 'check_output', lambda *a, **kw: 'commit\n')
+    commands = []
+    def run(command, **kwargs):
+        commands.append(command)
+        if 'eval.py' in command:
+            directory = output/'eval_epoch_01'
+            directory.mkdir()
+            (directory/'metrics_summary.json').write_text(json.dumps(dict(mean_ap=.1, nd_score=.2)))
+    monkeypatch.setattr(runner.subprocess, 'run', run)
+    runner.main()
+    status = json.loads((output/'status.json').read_text())
+    assert status['state'] == 'completed'
+    assert status['resumes'][0]['step'] == 2
+    assert status['elapsed_seconds'] >= 12
+    assert 'error' not in status
+    assert status['validation'][0]['epoch'] == 1
+    assert '--resume' in commands[0]
+    assert log.read_text().startswith('original failure\n')
+    assert [json.loads(row)['step'] for row in (training/'metrics.jsonl').read_text().splitlines()] == [1, 2]
+    assert next(training.glob('metrics_before_resume_*.jsonl')).read_text() == original
+    assert next(output.glob('status_before_resume_*.json')).exists()
+    assert (output/'best.pt').exists()
