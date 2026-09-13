@@ -1,0 +1,145 @@
+{
+  "date": "2026-09-12",
+  "geometry_unit_tests_passed": 4,
+  "pip_check": "No broken requirements found",
+  "batches": {
+    "train": {
+      "status": "PASS",
+      "split": "mini_train",
+      "dataset_items": 323,
+      "split_scenes": 8,
+      "disjoint_scene_splits": true,
+      "shapes": {
+        "camera": [
+          2,
+          3,
+          384,
+          640
+        ],
+        "lidar": [
+          2,
+          1,
+          384,
+          640
+        ],
+        "radar": [
+          2,
+          1,
+          384,
+          640
+        ]
+      },
+      "lidar_valid_pixels": [
+        3114,
+        3092
+      ],
+      "radar_valid_pixels": [
+        45,
+        48
+      ],
+      "boxes_per_item": [
+        3,
+        3
+      ],
+      "official_projection_max_abs_error": {
+        "LIDAR_TOP": 0.021955254204129915,
+        "RADAR_FRONT": 5.678350566995505e-05,
+        "RADAR_FRONT_LEFT": 0.0,
+        "RADAR_FRONT_RIGHT": 0.0,
+        "RADAR_BACK_LEFT": 0.0,
+        "RADAR_BACK_RIGHT": 0.0
+      },
+      "gpu_transfer_checked": true,
+      "sample_tokens": [
+        "cd9964f8c3d34383b16e9c2997de1ed0",
+        "9ab95de13c2d432ebb678ebb5da1ac5e"
+      ],
+      "camera_channels": [
+        "CAM_FRONT",
+        "CAM_FRONT"
+      ],
+      "workers": 2,
+      "model_built": false,
+      "training_run": false
+    },
+    "validation": {
+      "status": "PASS",
+      "split": "mini_val",
+      "dataset_items": 486,
+      "split_scenes": 2,
+      "disjoint_scene_splits": true,
+      "shapes": {
+        "camera": [
+          6,
+          3,
+          384,
+          640
+        ],
+        "lidar": [
+          6,
+          1,
+          384,
+          640
+        ],
+        "radar": [
+          6,
+          1,
+          384,
+          640
+        ]
+      },
+      "lidar_valid_pixels": [
+        5036,
+        3691,
+        3706,
+        3462,
+        4097,
+        3576
+      ],
+      "radar_valid_pixels": [
+        51,
+        41,
+        38,
+        11,
+        18,
+        13
+      ],
+      "boxes_per_item": [
+        3,
+        13,
+        3,
+        19,
+        2,
+        11
+      ],
+      "official_projection_max_abs_error": {
+        "LIDAR_TOP": 0.021236044835950096,
+        "RADAR_FRONT": 0.0,
+        "RADAR_FRONT_LEFT": 0.0,
+        "RADAR_FRONT_RIGHT": 0.0,
+        "RADAR_BACK_LEFT": 4.849583046961925e-05,
+        "RADAR_BACK_RIGHT": 3.0087667937550577e-05
+      },
+      "gpu_transfer_checked": true,
+      "sample_tokens": [
+        "b5989651183643369174912bc5641d3b",
+        "b5989651183643369174912bc5641d3b",
+        "b5989651183643369174912bc5641d3b",
+        "b5989651183643369174912bc5641d3b",
+        "b5989651183643369174912bc5641d3b",
+        "b5989651183643369174912bc5641d3b"
+      ],
+      "camera_channels": [
+        "CAM_BACK",
+        "CAM_FRONT",
+        "CAM_FRONT_LEFT",
+        "CAM_FRONT_RIGHT",
+        "CAM_BACK_LEFT",
+        "CAM_BACK_RIGHT"
+      ],
+      "workers": 2,
+      "model_built": false,
+      "training_run": false
+    }
+  }
+}
