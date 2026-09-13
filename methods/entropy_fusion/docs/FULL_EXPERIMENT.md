@@ -53,20 +53,44 @@ systemctl --user stop entropy-fusion-full.service
 ```
 
 If interrupted, the latest checkpoint preserves optimizer/RNG state and the
-position within that epoch. Up to 999 steps since its save may be lost. The staged
-runner requires an empty directory for a new experiment; do not blindly restart
-it on existing artifacts. Training can be resumed explicitly in the prepared
-environment after confirming that the original process has stopped:
+position within that epoch. Up to 999 steps since its save may be lost. After
+confirming that the original process has stopped, resume the staged runner:
 
 ```bash
-python train.py --version v1.0-trainval --split train --epochs 20 \
-  --checkpoint-every 1000 --output outputs/full_20epoch_20260913/training \
-  --resume outputs/full_20epoch_20260913/training/last.pt
+python -m scripts.run_full_experiment --epochs 20 --validate-every 5 \
+  --output outputs/full_20epoch_20260913 --resume
 ```
 
-That manual command resumes training only; schedule evaluation separately if
-recovering outside the staged runner. See `eval.py --help` and use `--split val`.
-The original staged run performs its scheduled evaluations automatically.
+This retains scheduled validation and archives the previous status and metrics.
+Metrics after the restored checkpoint are removed from the active metrics file;
+the original log remains in the archive. Stage logs are appended to. The local
+service now includes `--resume`, so restarting that existing service uses this
+recovery path. If systemd has collected the stopped transient unit, it must be
+created again; the Python command above also works in the prepared environment. Loading metadata and replaying the shuffled loader up to the saved
+position can leave the GPU idle briefly before updates resume.
+
+## September 13 recovery
+
+The first attempt crashed at 15:56 CDT while loading step 5,478: a projected
+LiDAR coordinate rounded to x=640 for a 640-pixel image. Commit `c3bc5bc` filters
+points that round outside the image after projection and resizing. The exact
+failing CAM_BACK sample now passes loading and a finite forward/backward update;
+boundary regression tests cover this case. The rasterizer still rejects invalid
+inputs rather than silently dropping entire samples.
+
+Commit `328cb53` adds staged-run recovery with log preservation. All 12 method
+tests passed. The service restarted at 18:12 CDT from step 5,000, replaying the
+477 successful updates that had not been checkpointed. This recovery preserves
+the model, optimizer and validation schedule; it does not reset training.
+
+The first recovery attempt encountered CPU thread contention during loader replay.
+The service was restarted with `OPENBLAS_NUM_THREADS=1`, `OMP_NUM_THREADS=1` and
+`MKL_NUM_THREADS=1`; PyTorch's existing explicit training thread setting remains.
+Training then passed step 8,234 with no skipped updates since recovery. The new
+step-8,000 checkpoint was reopened and all model tensors were finite. GPU
+utilization was sampled at 70%. These are observations at recovery verification,
+not a continuously updated health report; inspect the service and live metrics
+for current status.
 
 The initial planning estimate is 2–3 days including validation. Re-estimate from
 sustained full-data throughput; no completion or accuracy guarantee is implied.
