@@ -37,9 +37,8 @@ python train.py --epochs 20 --resume outputs/mini_experiment/last.pt --output ou
 python eval.py --checkpoint outputs/mini_experiment/last.pt --output outputs/mini_experiment_eval
 ```
 
-These longer training commands were not run during implementation. There is no
-background training job. Inspect the mini learning curves and held-out metrics
-before investing in full training; loss reduction on one repeated training view
+These commands start longer training jobs. Inspect the mini learning curves and
+held-out metrics before investing in full training; loss reduction on one repeated training view
 only verifies learning mechanics.
 
 Checkpoints are written at epoch completion and at an explicit `--max-steps` stop.
