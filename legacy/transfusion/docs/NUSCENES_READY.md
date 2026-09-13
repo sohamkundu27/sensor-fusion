@@ -32,7 +32,7 @@ train/validation preparation. On a different machine, create the local link with
 2. Activate the prepared environment and rerun the synthetic operator check:
 
    ```bash
-   cd ~/sensor-fusion
+   cd ~/sensor-fusion/legacy/transfusion
    source scripts/activate_transfusion.sh
    python scripts/check_environment.py
    ```
