@@ -46,6 +46,8 @@ held-out metrics before investing in full training; loss reduction on one repeat
 only verifies learning mechanics.
 
 Checkpoints are written at epoch completion and at an explicit `--max-steps` stop.
+`--checkpoint-every N` additionally saves every N microbatches at optimizer boundaries;
+the full experiment uses 1000.
 A crash or interrupt mid-epoch can lose updates since the preceding checkpoint.
 `--max-steps` counts absolute microbatches, including after resume, not optimizer
 updates. It flushes any partial accumulation window before saving. Resuming a run
@@ -97,7 +99,7 @@ python train.py --version v1.0-trainval --split train --epochs 20 --output outpu
 python eval.py --split val --checkpoint outputs/full_experiment/last.pt --output outputs/full_experiment_eval
 ```
 
-Full-data training and validation have not been exercised. The devkit holds full
+The [full experiment](FULL_EXPERIMENT.md) has started and its initial training steps passed. Full validation and final accuracy remain pending. The devkit holds full
 metadata in CPU memory; monitor host RAM and loader throughput. Mini timings do not
 establish full-data runtime. Each complete six-view pass visits 168,780 training
 items (28,130 keyframes); there is no CBGS expansion in this method.
