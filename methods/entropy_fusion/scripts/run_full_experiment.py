@@ -92,7 +92,7 @@ def main():
             if historical and not checkpoint.exists():
                 raise RuntimeError(f'Missing historical checkpoint for unevaluated epoch {stage}')
             update(state='training', target_epoch=stage)
-            command = ['train.py', '--epochs', str(stage), '--output', str(output/'training'), '--version', 'v1.0-trainval', '--split', 'train', '--root', args.root, '--checkpoint-every', '1000']
+            command = ['train.py', '--device', 'cuda', '--epochs', str(stage), '--output', str(output/'training'), '--version', 'v1.0-trainval', '--split', 'train', '--root', args.root, '--checkpoint-every', '1000']
             if (output/'training/last.pt').exists():
                 command += ['--resume', str(output/'training/last.pt')]
             if not historical:

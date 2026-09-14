@@ -120,3 +120,25 @@ scheduled validations when the user service manager starts after reboot. This
 post-reboot recovery has not yet been verified. Save open work and reboot the
 machine, then verify fresh step records beyond 341,110 and a new checkpoint.
 Commit `2f94216` adds SIGUSR1 thread dumps to the training log for future diagnosis.
+
+## Post-reboot driver check
+
+The reboot at approximately 20:52 CDT cleared the observed kernel lockup, but
+booted kernel `7.0.0-31-generic`. Installed NVIDIA modules covered the older
+6.14 kernels only, and `modinfo nvidia` found no module for the running kernel.
+Automatic resume briefly ran on CPU; it was stopped before a new checkpoint.
+The staged training command now explicitly requests CUDA, and the local service
+has an `ExecStartPre=/usr/bin/nvidia-smi` check. Training remains stopped pending
+driver repair and GPU validation. The original kernel fault's cause remains unknown.
+
+APT simulation resolves the missing module and matching 580-series libraries via:
+
+```bash
+sudo apt install linux-modules-nvidia-580-open-generic-hwe-24.04 nvidia-driver-580-open
+sudo modprobe nvidia
+nvidia-smi
+```
+
+These installation commands have not been executed: sudo requires the user's
+password. After driver repair, verify CUDA and a bounded training interval before
+relying on unattended execution. Do not infer GPU health from service state alone.
