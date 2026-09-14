@@ -143,3 +143,11 @@ Validation runs after epochs 1, 5, 10, 15 and 20 and selects best.pt by mAP.
 If epoch-one mAP is below 2%, the runner stops and records the reason; intervention
 is required before continuing that failed experiment. Keeping the machine awake
 and powered on is still necessary.
+
+Launched September 14, 2026 at 14:43 CDT from commit `87bb07b`. Full training
+passed 1,938 batches at startup verification, with zero skipped updates. The first
+step-1,000 checkpoint reopened with finite weights and the selected recipe
+(single-modality dropout, effective batch two, AMP, DHI inputs and image NMS).
+GPU utilization was sampled at 75%, temperature 53 C. Local verification is in
+`outputs/paper_v2_full_20260914/startup_verification.json`. These observations
+confirm startup only; inspect live metrics and validation for current progress.
