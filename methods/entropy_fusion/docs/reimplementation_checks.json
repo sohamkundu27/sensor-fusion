@@ -1,0 +1,189 @@
+{
+  "tests_passed": 30,
+  "learning_check": {
+    "status": "PASS",
+    "steps": 80,
+    "first_loss": 14.789235305786132,
+    "last_loss": 1.867638349533081,
+    "first_center_error_m": 8.486784172058105,
+    "last_center_error_m": 1.3476789951324464,
+    "gradient_l1": {
+      "camera": 74986.8517100811,
+      "lidar": 3017.4292920678854,
+      "radar": 2487.3294383734465,
+      "exchange": 42678.048058986664,
+      "head": 43158.45690520853
+    },
+    "parameters": 15730860,
+    "peak_allocated_gib": 0.6095623970031738,
+    "decoded_per_view": [
+      33,
+      30
+    ],
+    "note": "Repeated two training views with dropout off; tests mechanics, not held-out accuracy."
+  },
+  "mini_selected": {
+    "epochs": 5,
+    "mAP": 0.04021258943509308,
+    "NDS": 0.04644476409882108,
+    "checkpoint_steps": 4845
+  },
+  "original_full": {
+    "mAP": 0.15912606354160794,
+    "NDS": 0.24168524519826223
+  },
+  "anchor_coverage": {
+    "seed": 1234,
+    "views": 96,
+    "anchor_counts": {
+      "old": 30240,
+      "new": 30726
+    },
+    "overall": {
+      "count": 455,
+      "old": {
+        "mean_best_iou": 0.5166378145628087,
+        "below_05": 0.3824175824175824,
+        "below_01": 0.1054945054945055
+      },
+      "new": {
+        "mean_best_iou": 0.5995102249167777,
+        "below_05": 0.16703296703296702,
+        "below_01": 0.004395604395604396
+      }
+    },
+    "by_class": {
+      "car": {
+        "count": 161,
+        "old": {
+          "mean_best_iou": 0.5657733806541988,
+          "below_05": 0.3105590062111801,
+          "below_01": 0.031055900621118012
+        },
+        "new": {
+          "mean_best_iou": 0.6191821339893044,
+          "below_05": 0.11180124223602485,
+          "below_01": 0.0
+        }
+      },
+      "truck": {
+        "count": 40,
+        "old": {
+          "mean_best_iou": 0.6513598491903394,
+          "below_05": 0.2,
+          "below_01": 0.05
+        },
+        "new": {
+          "mean_best_iou": 0.6023301802575588,
+          "below_05": 0.15,
+          "below_01": 0.025
+        }
+      },
+      "bus": {
+        "count": 3,
+        "old": {
+          "mean_best_iou": 0.6052549680074056,
+          "below_05": 0.3333333333333333,
+          "below_01": 0.0
+        },
+        "new": {
+          "mean_best_iou": 0.6760400732358297,
+          "below_05": 0.0,
+          "below_01": 0.0
+        }
+      },
+      "trailer": {
+        "count": 11,
+        "old": {
+          "mean_best_iou": 0.7304177175868641,
+          "below_05": 0.0,
+          "below_01": 0.0
+        },
+        "new": {
+          "mean_best_iou": 0.6553491245616566,
+          "below_05": 0.0,
+          "below_01": 0.0
+        }
+      },
+      "construction_vehicle": {
+        "count": 2,
+        "old": {
+          "mean_best_iou": 0.7992923557758331,
+          "below_05": 0.0,
+          "below_01": 0.0
+        },
+        "new": {
+          "mean_best_iou": 0.7061598300933838,
+          "below_05": 0.0,
+          "below_01": 0.0
+        }
+      },
+      "pedestrian": {
+        "count": 94,
+        "old": {
+          "mean_best_iou": 0.43009114590414027,
+          "below_05": 0.5319148936170213,
+          "below_01": 0.2553191489361702
+        },
+        "new": {
+          "mean_best_iou": 0.5695981540261431,
+          "below_05": 0.2872340425531915,
+          "below_01": 0.0
+        }
+      },
+      "motorcycle": {
+        "count": 9,
+        "old": {
+          "mean_best_iou": 0.6182294686635336,
+          "below_05": 0.1111111111111111,
+          "below_01": 0.0
+        },
+        "new": {
+          "mean_best_iou": 0.6524741980764601,
+          "below_05": 0.0,
+          "below_01": 0.0
+        }
+      },
+      "bicycle": {
+        "count": 8,
+        "old": {
+          "mean_best_iou": 0.4671273548156023,
+          "below_05": 0.5,
+          "below_01": 0.125
+        },
+        "new": {
+          "mean_best_iou": 0.6329420395195484,
+          "below_05": 0.125,
+          "below_01": 0.0
+        }
+      },
+      "traffic_cone": {
+        "count": 37,
+        "old": {
+          "mean_best_iou": 0.3706004955629642,
+          "below_05": 0.6216216216216216,
+          "below_01": 0.05405405405405406
+        },
+        "new": {
+          "mean_best_iou": 0.5966840662263535,
+          "below_05": 0.13513513513513514,
+          "below_01": 0.02702702702702703
+        }
+      },
+      "barrier": {
+        "count": 90,
+        "old": {
+          "mean_best_iou": 0.47817203063103886,
+          "below_05": 0.4111111111111111,
+          "below_01": 0.15555555555555556
+        },
+        "new": {
+          "mean_best_iou": 0.5754555586311553,
+          "below_05": 0.2111111111111111,
+          "below_01": 0.0
+        }
+      }
+    }
+  },
+  "note": "Pilot and coverage diagnostics do not establish full-validation improvement; all original results preserved."
+}

@@ -7,18 +7,13 @@ Heide’s CVPR 2020 paper, [Seeing Through Fog Without Seeing Fog](https://arxiv
 Our three-modality, camera-ray 3D baseline is an adaptation of their ideas, with
 no gated NIR stream and no claim of reproducing their reported results.
 
-An ImageNet-pretrained ResNet18 processes RGB, while smaller CNNs process sparse
-LiDAR and radar depth maps. Masked patch entropy and sensor coverage steer feature
-gates at three resolutions. An SSD-style head predicts classes, image boxes, metric
-3D centers and dimensions, orientation, velocity, and attributes. Per-sample
-modality dropout encourages the detector to use complementary inputs.
-
-The project supports training checkpoints, resume, mixed precision, gradient
-accumulation, and official nuScenes 3D evaluation after merging detections from
-all six camera views. Development uses the ten-scene nuScenes-mini split; raw
-data and checkpoints remain outside Git. A [20-epoch mini experiment](docs/MINI_EXPERIMENT.md) completed successfully,
-with 4.76% validation mAP. Held-out accuracy remains low, and adverse-weather
-robustness has not been established.
+The revised model exchanges entropy-steered features between sensor branches
+throughout feature extraction. It uses LiDAR depth, height and intensity; radar
+depth, reflectivity and compensated velocity; and a six-scale SSD head with
+metric 3D supervision. The original completed full nuScenes baseline achieved
+15.91% mAP and 24.17% NDS. The [paper-informed revision](docs/REIMPLEMENTATION.md)
+addresses identified fusion, localization and small-object limitations; its
+accuracy and adverse-weather robustness still require evaluation.
 
 See the [architecture and design choices](docs/MODEL_PLAN.md),
 [data contract](docs/DATA_PIPELINE.md), [training instructions](docs/TRAINING.md),

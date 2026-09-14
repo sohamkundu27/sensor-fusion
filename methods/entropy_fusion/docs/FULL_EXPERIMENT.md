@@ -1,5 +1,9 @@
 # Full nuScenes experiment
 
+This original run completed all 20 epochs on September 14 at 13:34 CDT,
+with 15.91% mAP and 24.17% NDS. The new paper-informed run is documented in
+[REIMPLEMENTATION.md](REIMPLEMENTATION.md) and uses `entropy-fusion-v2.service`.
+
 Started September 13, 2026 at 15:52 CDT using training code commit
 `af8830de0b48832e74f5fc2147ec3d5795898b2e`. This is a fresh entropy-fusion
 run with ImageNet camera initialization, rather than a continuation of the mini
