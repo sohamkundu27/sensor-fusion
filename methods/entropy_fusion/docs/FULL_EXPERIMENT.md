@@ -159,5 +159,5 @@ the cause of the original fault. The full service was then started to resume the
 original checkpoint and retain scheduled validation.
 
 Full-run recovery subsequently passed step 341,748 with sampled GPU utilization
-of 75%; the new step-342,000 checkpoint was reopened with finite model weights.
+of 75%; the new step-343,000 checkpoint was reopened with finite model weights.
 These are recovery observations, not a live health report.
