@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from nuscenes.eval.detection.config import config_factory
 from nuscenes.eval.detection.evaluate import NuScenesEval
 from data import NuScenesFusionDataset, collate_fusion_batch, CAMERAS
-from models.detector import EntropyFusionDetector
+from models.factory import build_model
 from models.predictions import decode_predictions, merge_views
 from train import move_inputs
 
@@ -20,26 +20,30 @@ def main():
     parser.add_argument('--output', type=Path, default=Path('outputs/evaluation'))
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--workers', type=int, default=2)
-    parser.add_argument('--score-threshold', type=float, default=.05)
+    parser.add_argument('--score-threshold', type=float, help='Defaults to checkpoint recipe; baseline .05, revised .01')
     parser.add_argument('--topk', type=int, default=100, help='Max predictions per view before global merging')
     parser.add_argument('--max-batches', type=int, default=0, help='Partial export smoke test only; disables official metrics')
     parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu')
     args = parser.parse_args()
+    checkpoint = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
+    if args.score_threshold is None:
+        args.score_threshold = .01 if checkpoint['config'].get('model_variant') == 'paper_v2' else .05
     if args.batch_size < 1 or args.workers < 0 or args.topk < 1 or not 0 <= args.score_threshold <= 1 or args.max_batches < 0:
         parser.error('Invalid batch, worker, topk, threshold or batch-limit setting')
     torch.set_num_threads(8)
     device = torch.device(args.device)
-    checkpoint = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
     if checkpoint.get('format_version') != 1:
         raise ValueError('Checkpoint predates the camera-relative 3D encoding')
     config = checkpoint['config']
-    model = EntropyFusionDetector(pretrained=False, modality_dropout=config['modality_dropout']).to(device)
+    model = build_model(config, pretrained=False).to(device)
     model.load_state_dict(checkpoint['model'])
     model.eval()
     dataset = NuScenesFusionDataset(args.root, version='v1.0-mini' if args.split=='mini_val' else 'v1.0-trainval',
-                                   split=args.split, cameras=CAMERAS, image_hw=config['image_hw'])
+                                   split=args.split, cameras=CAMERAS, image_hw=config['image_hw'],
+                                   sensor_encoding=config.get('sensor_encoding','depth'))
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers,
-                        collate_fn=collate_fusion_batch, pin_memory=device.type=='cuda')
+                        collate_fn=collate_fusion_batch, pin_memory=device.type=='cuda', timeout=120 if args.workers else 0,
+                        **({'multiprocessing_context':config.get('worker_start_method','fork')} if args.workers else {}))
     # Every split token must be present, including samples with no detections.
     results = {token: [] for token, _ in dataset.items}
     processed = 0

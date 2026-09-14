@@ -15,7 +15,9 @@ REPO = Path(__file__).resolve().parents[1]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--config', type=Path, help='Training configuration; stored in checkpoints')
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--resume-if-present', action='store_true', help='Start fresh or resume a checkpoint in this experiment directory')
     parser.add_argument('--resume', action='store_true', help='Resume an interrupted experiment and retain validation history')
     parser.add_argument('--root', default=str(Path.home()/'data/nuscenes'))
     parser.add_argument('--epochs', type=int, default=20)
@@ -25,6 +27,7 @@ def main():
         parser.error('Epoch and validation intervals must be positive')
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    args.resume = args.resume or (args.resume_if_present and (output/'training/last.pt').exists())
     if any(output.iterdir()) and not args.resume:
         raise FileExistsError('Choose an empty experiment directory or use --resume')
     status = dict(state='starting', pid=os.getpid(), started_utc=datetime.now(timezone.utc).isoformat(),
@@ -93,6 +96,8 @@ def main():
                 raise RuntimeError(f'Missing historical checkpoint for unevaluated epoch {stage}')
             update(state='training', target_epoch=stage)
             command = ['train.py', '--device', 'cuda', '--epochs', str(stage), '--output', str(output/'training'), '--version', 'v1.0-trainval', '--split', 'train', '--root', args.root, '--checkpoint-every', '1000']
+            if args.config:
+                command += ['--config', str(args.config.resolve())]
             if (output/'training/last.pt').exists():
                 command += ['--resume', str(output/'training/last.pt')]
             if not historical:
@@ -100,7 +105,7 @@ def main():
                 shutil.copy2(output/'training/last.pt', checkpoint)
             update(state='evaluating', completed_epochs=stage)
             eval_dir = output/f'eval_epoch_{stage:02}'
-            run(['eval.py', '--root', args.root, '--split', 'val', '--checkpoint', str(checkpoint), '--output', str(eval_dir)], output/f'eval_epoch_{stage:02}.log')
+            run(['eval.py', '--device', 'cuda', '--root', args.root, '--split', 'val', '--checkpoint', str(checkpoint), '--output', str(eval_dir)], output/f'eval_epoch_{stage:02}.log')
             metrics = json.loads((eval_dir/'metrics_summary.json').read_text())
             record = dict(epoch=stage, mAP=metrics['mean_ap'], NDS=metrics['nd_score'], checkpoint=str(checkpoint))
             status['validation'].append(record)

@@ -4,6 +4,7 @@ import faulthandler
 import signal
 from collections import deque
 import json
+import math
 import random
 import time
 from pathlib import Path
@@ -11,10 +12,10 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from data import NuScenesFusionDataset, collate_fusion_batch, CAMERAS
-from models.detector import EntropyFusionDetector
+from models.factory import build_model
 from models.losses import detection_loss
 
-INPUT_KEYS = ('camera', 'lidar', 'radar', 'camera_mask', 'lidar_mask', 'radar_mask')
+INPUT_KEYS = ('camera', 'lidar', 'radar', 'camera_mask', 'lidar_mask', 'radar_mask', 'lidar_depth_m', 'radar_depth_m')
 
 
 def move_inputs(batch, device):
@@ -33,6 +34,14 @@ def parse_args():
     pre.add_argument('--config', default=str(Path(__file__).parent/'configs/mini.json'))
     known, _ = pre.parse_known_args()
     parser = argparse.ArgumentParser(description=__doc__, parents=[pre])
+    parser.add_argument('--model-variant', choices=['baseline', 'paper_v2'], default='baseline')
+    parser.add_argument('--fusion-mode', choices=['entropy', 'concat'], default='entropy')
+    parser.add_argument('--sensor-encoding', choices=['depth', 'dhi'], default='depth')
+    parser.add_argument('--schedule-epochs', type=int, default=20)
+    parser.add_argument('--warmup-steps', type=int, default=1000)
+    parser.add_argument('--weight-decay', type=float, default=.01)
+    parser.add_argument('--photometric-augmentation', action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument('--worker-start-method', choices=['fork','spawn'], default='fork')
     parser.add_argument('--root', default=str(Path.home()/'data/nuscenes'))
     parser.add_argument('--version', choices=['v1.0-mini', 'v1.0-trainval'])
     parser.add_argument('--split', choices=['mini_train', 'train'])
@@ -60,6 +69,12 @@ def parse_args():
         parser.error('Positive LR and dropout in [0, 1] required')
     if args.amp and not args.device.startswith('cuda'):
         parser.error('This runner supports AMP on CUDA only')
+    if args.model_variant == 'baseline' and args.sensor_encoding != 'depth':
+        parser.error('baseline requires --sensor-encoding depth')
+    if args.model_variant == 'paper_v2' and args.sensor_encoding != 'dhi':
+        parser.error('paper_v2 requires --sensor-encoding dhi')
+    if (args.model_variant == 'paper_v2' and args.schedule_epochs < args.epochs) or args.warmup_steps < 0 or args.weight_decay < 0:
+        parser.error('Schedule must cover training, with nonnegative warmup/weight decay')
     return args
 
 
@@ -80,14 +95,16 @@ def main():
     if checkpoint:
         if checkpoint.get('format_version') != 1:
             raise ValueError('Checkpoint predates the camera-relative 3D encoding')
+        for key, default in [('model_variant','baseline'), ('fusion_mode','entropy'), ('sensor_encoding','depth'), ('weight_decay',.01), ('schedule_epochs',20), ('warmup_steps',1000), ('worker_start_method','fork'), ('photometric_augmentation',False)]:
+            if checkpoint['config'].get(key, default) != config[key]:
+                raise ValueError(f'Resume setting differs: {key}')
         for key in ('version', 'split', 'cameras', 'image_hw', 'batch_size', 'lr', 'amp', 'seed', 'accumulation_steps', 'modality_dropout'):
             if checkpoint['config'][key] != config[key]:
                 raise ValueError(f'Resume setting differs: {key}. Use the original training settings.')
     dataset = NuScenesFusionDataset(args.root, version=args.version, split=args.split,
-                                   cameras=args.cameras, image_hw=args.image_hw)
-    model = EntropyFusionDetector(pretrained=not args.no_pretrained and checkpoint is None,
-                                  modality_dropout=args.modality_dropout).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=.01)
+                                   cameras=args.cameras, image_hw=args.image_hw, sensor_encoding=args.sensor_encoding)
+    model = build_model(config, pretrained=not args.no_pretrained and checkpoint is None).to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp, init_scale=1024.)
     step, start_epoch, cursor = 0, 0, 0
     if checkpoint:
@@ -128,7 +145,9 @@ def main():
         # A dedicated, epoch-seeded generator makes shuffle order reproducible on resume.
         loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers,
                             collate_fn=collate_fusion_batch, pin_memory=device.type=='cuda',
-                            generator=torch.Generator().manual_seed(args.seed+epoch))
+                            generator=torch.Generator().manual_seed(args.seed+epoch),
+                            timeout=120 if args.workers else 0,
+                            **({'multiprocessing_context': args.worker_start_method} if args.workers else {}))
         iterator = iter(loader)
         first = cursor if epoch == start_epoch else 0
         for _ in range(first):
@@ -140,6 +159,19 @@ def main():
             started = time.perf_counter()
             batch = next(iterator)
             inputs = move_inputs(batch, device)
+            if args.photometric_augmentation:
+                rgb = inputs['camera']
+                brightness = torch.empty(len(rgb),1,1,1,device=device).uniform_(.8,1.2)
+                contrast = torch.empty_like(brightness).uniform_(.8,1.2)
+                inputs['camera'] = ((rgb-.5)*contrast+.5).mul(brightness).clamp(0,1)*inputs['camera_mask']
+            if args.model_variant == 'paper_v2':
+                total = len(loader)*args.schedule_epochs
+                warmup = max(args.warmup_steps,1)
+                factor = min(1.,(step+1)/warmup)
+                progress = min(1.,max(0.,(step-args.warmup_steps)/max(1,total-args.warmup_steps)))
+                factor *= .05+.95*.5*(1+math.cos(math.pi*progress))
+                for group in optimizer.param_groups:
+                    group['lr'] = args.lr*factor
             sync()
             loaded = time.perf_counter()
             if window == 0:
@@ -178,7 +210,7 @@ def main():
             sync()
             ended = time.perf_counter()
             step += 1
-            row = dict(step=step, epoch=epoch+1, data_seconds=loaded-started, compute_seconds=ended-loaded,
+            row = dict(step=step, epoch=epoch+1, lr=optimizer.param_groups[0]['lr'], data_seconds=loaded-started, compute_seconds=ended-loaded,
                        seconds=ended-started, gradient_norm=gradient_norm, skipped_optimizer_step=skipped_optimizer_step,
                        losses={k: float(v.detach()) if torch.is_tensor(v) else v for k,v in losses.items()},
                        active_modalities=pred['available'].sum(0).tolist(),

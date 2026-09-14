@@ -1,0 +1,22 @@
+{
+  "model_variant": "paper_v2",
+  "fusion_mode": "entropy",
+  "sensor_encoding": "dhi",
+  "version": "v1.0-mini",
+  "split": "mini_train",
+  "cameras": ["CAM_FRONT", "CAM_FRONT_LEFT", "CAM_FRONT_RIGHT", "CAM_BACK", "CAM_BACK_LEFT", "CAM_BACK_RIGHT"],
+  "image_hw": [384, 640],
+  "batch_size": 2,
+  "workers": 2,
+  "worker_start_method": "spawn",
+  "epochs": 20,
+  "schedule_epochs": 20,
+  "warmup_steps": 1000,
+  "lr": 0.0002,
+  "weight_decay": 0.0005,
+  "photometric_augmentation": true,
+  "modality_dropout": 0.5,
+  "accumulation_steps": 2,
+  "amp": true,
+  "seed": 42
+}
