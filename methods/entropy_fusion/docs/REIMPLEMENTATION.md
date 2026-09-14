@@ -170,3 +170,23 @@ gradients under selective AMP. CUDA regression tests reproduce the original
 convolution overflow and verify finite outputs/gradients with the fix for both
 entropy and concatenation modes. All 32 tests passed. Future nonfinite losses save
 a separate diagnostic batch/model snapshot without overwriting the last checkpoint.
+
+A bounded training replay from step 6,000 through 7,000 completed with all losses
+finite and finite saved weights. AMP's gradient scaler skipped one update at
+6,450 and continued; there was no nonfinite forward loss. The replay averaged
+0.0409 seconds per two-view batch and peaked at 0.659 GiB allocated VRAM. Artifacts
+are in `outputs/v2_precision_replay/`; the original failure snapshot is preserved
+in `outputs/v2_failure_replay/`.
+
+The persistent service resumed the original full run from step 6,000 at
+15:01 CDT on September 14, using fix commit `86a139c`. It reloads and skips already
+processed dataset batches before GPU updates resume. Previous logs/status are
+archived by the runner, and the resume commit is recorded in `status.json`.
+
+At 15:06 CDT the resumed full service had reached batch 7,309 and saved a new
+step-7,000 checkpoint with finite weights. All 1,309 resumed batch losses were
+finite; one optimizer update was skipped by AMP's gradient scaler. Measured
+throughput was 0.0385 seconds per batch, peak allocated VRAM 0.659 GiB, and sampled
+GPU utilization 73%. The local `outputs/paper_v2_full_20260914/recovery_verification.json`
+records these observations. This confirms recovery past the reproduced failure;
+full validation results are still pending.
