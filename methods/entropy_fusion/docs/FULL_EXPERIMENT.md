@@ -142,3 +142,22 @@ nvidia-smi
 These installation commands have not been executed: sudo requires the user's
 password. After driver repair, verify CUDA and a bounded training interval before
 relying on unattended execution. Do not infer GPU health from service state alone.
+
+## Driver repair and bounded recovery check
+
+The user installed the matching kernel modules and NVIDIA driver 580.173.02.
+The RTX 3080 is now visible on kernel 7.0.0-31-generic, and a CUDA
+forward/backward operation passed. An isolated checkpoint-resume check ran 200
+training updates, from step 341,000 through 341,200, crossing the earlier stall.
+All updates completed without optimizer skips; the resulting checkpoint reopened
+with finite model tensors. Mean measured update time was 0.0180 seconds and peak
+PyTorch allocated GPU memory was 0.344 GiB. Artifacts are in
+`outputs/post_reboot_check_20260913/`; the original full checkpoint was preserved.
+No kernel BUG, soft lockup, Oops or NVIDIA Xid messages were found during this
+check. This short check establishes recovery, not long-term system stability or
+the cause of the original fault. The full service was then started to resume the
+original checkpoint and retain scheduled validation.
+
+Full-run recovery subsequently passed step 341,748 with sampled GPU utilization
+of 75%; the new step-342,000 checkpoint was reopened with finite model weights.
+These are recovery observations, not a live health report.
