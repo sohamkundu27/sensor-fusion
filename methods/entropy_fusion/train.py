@@ -185,6 +185,20 @@ def main():
                 pred['metric_center_weight'] = .05+.2*min(1.,step/args.center_warmup_steps)
             losses = detection_loss(pred, batch['targets'], batch['metadata'], inputs['camera_mask'])
             if not torch.isfinite(losses['total']):
+                def stats(tensor):
+                    value = tensor.detach().float()
+                    finite = torch.isfinite(value)
+                    return dict(nonfinite=int((~finite).sum()),
+                                max_abs=float(value[finite].abs().max()) if finite.any() else None)
+                failure = dict(step=step+1, samples=[dict(token=m['sample_token'], camera=m['camera_channel']) for m in batch['metadata']],
+                    losses={k: str(float(v.detach())) if torch.is_tensor(v) else v for k,v in losses.items()},
+                    predictions={k:stats(v) for k,v in pred.items() if torch.is_tensor(v)},
+                    inputs={k:stats(v) for k,v in inputs.items()})
+                (args.output/f'failure_step_{step+1:08}.json').write_text(json.dumps(failure,indent=2)+'\n')
+                torch.save(dict(model=model.state_dict(), config=config, batch=batch,
+                    inputs={k:v.detach().cpu() for k,v in inputs.items()},
+                    available=pred['available'].detach().cpu()),args.output/f'failure_step_{step+1:08}.pt')
+                print(json.dumps(failure),flush=True)
                 raise FloatingPointError('Nonfinite loss; no new checkpoint written')
             scaler.scale(losses['total']/window_size).backward()
             window += 1
