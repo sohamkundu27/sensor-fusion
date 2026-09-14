@@ -46,13 +46,13 @@ def decode_predictions(prediction, metadata, score_threshold=.05, topk=100):
     output = []
     for i, meta in enumerate(metadata):
         scores, labels = prediction['logits'][i].float().softmax(-1)[:, 1:].max(-1)
-        if prediction.get('revised', False):
+        if prediction.get('revised', False) and prediction.get('quality_scoring', True):
             scores = scores * prediction['quality'][i,:,0].float().sigmoid()
         valid = prediction['valid_anchors'][i] if 'valid_anchors' in prediction else torch.ones_like(scores, dtype=torch.bool)
         candidate = torch.where((scores >= score_threshold) & valid)[0]
         candidate = candidate[scores[candidate].argsort(descending=True)[:1000]]
         boxes = decode_boxes(prediction['boxes'][i, candidate].float(), prediction['anchors'][candidate])
-        if prediction.get('revised', False):
+        if prediction.get('revised', False) and prediction.get('metric_suppression', True):
             keep = metric_nms(prediction['boxes3d'][i,candidate].float(), prediction['anchors'][candidate],
                               scores[candidate], labels[candidate], meta, topk)
         else:

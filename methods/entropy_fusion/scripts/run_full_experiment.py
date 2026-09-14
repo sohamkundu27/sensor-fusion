@@ -21,8 +21,11 @@ def main():
     parser.add_argument('--resume', action='store_true', help='Resume an interrupted experiment and retain validation history')
     parser.add_argument('--root', default=str(Path.home()/'data/nuscenes'))
     parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--minimum-first-map', type=float, default=0., help='Stop after epoch-one validation if mAP is below this experimental floor')
     parser.add_argument('--validate-every', type=int, default=5)
     args = parser.parse_args()
+    if not 0 <= args.minimum_first_map <= 1:
+        parser.error('Minimum mAP must be between zero and one')
     if args.epochs < 1 or args.validate_every < 1:
         parser.error('Epoch and validation intervals must be positive')
     output = args.output.resolve()
@@ -87,6 +90,8 @@ def main():
     stages = sorted({1, args.epochs, *range(args.validate_every, args.epochs+1, args.validate_every)})
     best = max((v['mAP'] for v in status['validation']), default=-1.)
     try:
+        if any(v['epoch'] == 1 and v['mAP'] < args.minimum_first_map for v in status['validation']):
+            raise RuntimeError('Recorded epoch-one mAP is below configured floor; inspect results before lowering the floor')
         for stage in stages:
             if any(v['epoch'] == stage for v in status['validation']):
                 continue
@@ -114,6 +119,8 @@ def main():
                 shutil.copy2(checkpoint, output/'best.pt')
                 status['best_epoch'], status['best_mAP'] = stage, best
             update(state='stage_complete')
+            if stage == 1 and record['mAP'] < args.minimum_first_map:
+                raise RuntimeError(f"Epoch-one mAP {record['mAP']:.4f} is below configured floor {args.minimum_first_map:.4f}; inspect before spending more training time")
         update(state='completed', finished_utc=datetime.now(timezone.utc).isoformat())
     except BaseException as error:
         update(state='failed', error=f'{type(error).__name__}: {error}')

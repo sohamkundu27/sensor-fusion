@@ -35,6 +35,8 @@ def parse_args():
     known, _ = pre.parse_known_args()
     parser = argparse.ArgumentParser(description=__doc__, parents=[pre])
     parser.add_argument('--model-variant', choices=['baseline', 'paper_v2'], default='baseline')
+    parser.add_argument('--dropout-mode', choices=['single','independent'], default='independent')
+    parser.add_argument('--center-warmup-steps', type=int, default=0)
     parser.add_argument('--fusion-mode', choices=['entropy', 'concat'], default='entropy')
     parser.add_argument('--sensor-encoding', choices=['depth', 'dhi'], default='depth')
     parser.add_argument('--schedule-epochs', type=int, default=20)
@@ -95,7 +97,7 @@ def main():
     if checkpoint:
         if checkpoint.get('format_version') != 1:
             raise ValueError('Checkpoint predates the camera-relative 3D encoding')
-        for key, default in [('model_variant','baseline'), ('fusion_mode','entropy'), ('sensor_encoding','depth'), ('weight_decay',.01), ('schedule_epochs',20), ('warmup_steps',1000), ('worker_start_method','fork'), ('photometric_augmentation',False)]:
+        for key, default in [('model_variant','baseline'), ('fusion_mode','entropy'), ('sensor_encoding','depth'), ('weight_decay',.01), ('schedule_epochs',20), ('warmup_steps',1000), ('dropout_mode','independent'), ('center_warmup_steps',0), ('worker_start_method','fork'), ('photometric_augmentation',False)]:
             if checkpoint['config'].get(key, default) != config[key]:
                 raise ValueError(f'Resume setting differs: {key}')
         for key in ('version', 'split', 'cameras', 'image_hw', 'batch_size', 'lr', 'amp', 'seed', 'accumulation_steps', 'modality_dropout'):
@@ -179,6 +181,8 @@ def main():
                                   args.max_steps-step if args.max_steps else len(loader))
             with torch.autocast(device_type=device.type, enabled=args.amp, dtype=torch.float16):
                 pred = model(inputs)
+            if args.model_variant == 'paper_v2' and args.center_warmup_steps:
+                pred['metric_center_weight'] = .05+.2*min(1.,step/args.center_warmup_steps)
             losses = detection_loss(pred, batch['targets'], batch['metadata'], inputs['camera_mask'])
             if not torch.isfinite(losses['total']):
                 raise FloatingPointError('Nonfinite loss; no new checkpoint written')

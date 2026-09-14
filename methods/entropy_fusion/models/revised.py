@@ -12,6 +12,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from .backbone import CameraBackbone, conv_block
+from .fusion import drop_modalities
 
 
 class MeasurementEntropy(nn.Module):
@@ -118,10 +119,13 @@ class ProgressiveFeatureExchange(nn.Module):
 
 
 class ReimplementedEntropyFusionDetector(nn.Module):
-    def __init__(self, pretrained=True, modality_dropout=.5, fusion_mode='entropy'):
+    def __init__(self, pretrained=True, modality_dropout=.5, fusion_mode='entropy', dropout_mode='independent'):
         super().__init__()
         from .revised_head import RevisedDetectionHead
         self.modality_dropout = modality_dropout
+        self.dropout_mode = dropout_mode
+        if dropout_mode not in ('single','independent'):
+            raise ValueError('Unknown modality dropout mode')
         self.fusion_mode = fusion_mode
         self.camera = CameraBackbone(pretrained)
         self.lidar, self.radar = SensorBackbone(), SensorBackbone()
@@ -135,7 +139,8 @@ class ReimplementedEntropyFusionDetector(nn.Module):
     def forward(self, batch):
         inputs = [batch[k] for k in ('camera', 'lidar', 'radar')]
         masks = [batch[k + '_mask'] for k in ('camera', 'lidar', 'radar')]
-        inputs, masks, available = drop_independent_modalities(inputs, masks, self.modality_dropout, self.training)
+        dropout = drop_modalities if self.dropout_mode == 'single' else drop_independent_modalities
+        inputs, masks, available = dropout(inputs, masks, self.modality_dropout, self.training)
         entropies = [self.entropy(x, m) for x, m in zip(inputs, masks)] if self.fusion_mode == 'entropy' else None
         inputs[0] = ((inputs[0] - self.mean) / self.std) * masks[0]
         networks = (self.camera, self.lidar, self.radar)
@@ -155,5 +160,6 @@ class ReimplementedEntropyFusionDetector(nn.Module):
         result['valid_anchors'] = batch['camera_mask'][:, 0, center[:, 1].long().clamp(0, h - 1),
                                                       center[:, 0].long().clamp(0, w - 1)]
         result['available'] = available
+        result['metric_suppression'] = getattr(self, 'metric_suppression', True)
         result['revised'] = True
         return result

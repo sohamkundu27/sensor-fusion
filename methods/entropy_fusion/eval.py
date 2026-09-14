@@ -20,14 +20,16 @@ def main():
     parser.add_argument('--output', type=Path, default=Path('outputs/evaluation'))
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--workers', type=int, default=2)
-    parser.add_argument('--score-threshold', type=float, help='Defaults to checkpoint recipe; baseline .05, revised .01')
+    parser.add_argument('--score-threshold', type=float, help='Defaults to checkpoint recipe; baseline .05, revised .001')
+    parser.add_argument('--metric-suppression', action=argparse.BooleanOptionalAction, default=None, help='Override revised metric NMS with image IoU NMS for diagnostics')
+    parser.add_argument('--quality-scoring', action=argparse.BooleanOptionalAction, default=None, help='Override revised localization-quality score calibration')
     parser.add_argument('--topk', type=int, default=100, help='Max predictions per view before global merging')
     parser.add_argument('--max-batches', type=int, default=0, help='Partial export smoke test only; disables official metrics')
     parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu')
     args = parser.parse_args()
     checkpoint = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
     if args.score_threshold is None:
-        args.score_threshold = .01 if checkpoint['config'].get('model_variant') == 'paper_v2' else .05
+        args.score_threshold = .001 if checkpoint['config'].get('model_variant') == 'paper_v2' else .05
     if args.batch_size < 1 or args.workers < 0 or args.topk < 1 or not 0 <= args.score_threshold <= 1 or args.max_batches < 0:
         parser.error('Invalid batch, worker, topk, threshold or batch-limit setting')
     torch.set_num_threads(8)
@@ -50,6 +52,10 @@ def main():
     with torch.inference_mode():
         for batch_index, batch in enumerate(loader):
             prediction = model(move_inputs(batch, device))
+            if args.metric_suppression is not None:
+                prediction['metric_suppression'] = args.metric_suppression
+            if args.quality_scoring is not None:
+                prediction['quality_scoring'] = args.quality_scoring
             for meta, records in zip(batch['metadata'], decode_predictions(prediction, batch['metadata'], args.score_threshold, args.topk)):
                 results[meta['sample_token']].extend(records)
                 processed += 1
@@ -67,7 +73,8 @@ def main():
     status = dict(complete=complete, processed_views=processed, total_views=len(dataset),
                   sample_tokens=len(results), prediction_count=sum(map(len, results.values())),
                   checkpoint=str(args.checkpoint.resolve()), checkpoint_step=checkpoint['step'],
-                  score_threshold=args.score_threshold, topk_per_view=args.topk, split=args.split)
+                  score_threshold=args.score_threshold, quality_scoring=args.quality_scoring if args.quality_scoring is not None else config.get('model_variant')=='paper_v2',
+                  metric_suppression=args.metric_suppression if args.metric_suppression is not None else config.get('metric_suppression',config.get('model_variant')=='paper_v2'), topk_per_view=args.topk, split=args.split)
     (args.output/'run.json').write_text(json.dumps(status, indent=2))
     if not complete:
         print('Partial export only; official metrics were NOT run.', flush=True)

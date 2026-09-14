@@ -117,7 +117,7 @@ def detection_loss(prediction, targets, metadata, camera_masks):
     losses = {key: value/len(targets) for key, value in losses.items()}
     losses['total'] = losses['logits'] + losses['boxes'] + losses['boxes3d'] + .2*losses['attributes']
     if revised:
-        losses['total'] = losses['total'] + .25*losses['center_meters'] + .1*losses['velocity_mps'] + .5*losses['quality']
+        losses['total'] = losses['total'] + float(prediction.get('metric_center_weight',.25))*losses['center_meters'] + .1*losses['velocity_mps'] + .5*losses['quality']
         losses['center_error_meters'] = center_error_sum / max(total_positive, 1)
     losses['positive_anchors'] = total_positive
     return losses
