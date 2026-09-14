@@ -10,7 +10,8 @@ from nuscenes.nuscenes import NuScenes
 from nuscenes.utils.data_classes import LidarPointCloud, RadarPointCloud
 from nuscenes.utils.splits import create_splits_scenes
 from nuscenes.eval.detection.utils import category_to_detection_name
-from .geometry import sensor_to_global, transform_points, project_points, rasterize_depth, project_box, filter_visible_points
+from .geometry import (sensor_to_global, transform_points, project_points, rasterize_depth,
+                       rasterize_features, project_box, filter_visible_points)
 
 CAMERAS = ('CAM_FRONT', 'CAM_FRONT_LEFT', 'CAM_FRONT_RIGHT', 'CAM_BACK', 'CAM_BACK_LEFT', 'CAM_BACK_RIGHT')
 RADARS = ('RADAR_FRONT', 'RADAR_FRONT_LEFT', 'RADAR_FRONT_RIGHT', 'RADAR_BACK_LEFT', 'RADAR_BACK_RIGHT')
@@ -21,18 +22,30 @@ CLASSES = ('car', 'truck', 'bus', 'trailer', 'construction_vehicle', 'pedestrian
 class NuScenesFusionDataset(Dataset):
     """One item per keyframe/camera. Split by scene before expanding camera views.
 
-    RGB is [0,1]; depth inputs are camera-Z/max_depth, zero at missing pixels.
+    RGB is [0,1]; default depth inputs are camera-Z/max_depth.
+    ``sensor_encoding='dhi'`` supplies three channels in [0,1] per sensor:
+    LiDAR camera-Z/max_depth, height in the capture-time ego frame mapped from
+    [-3,5] metres, and return intensity/255. Height and intensity are clipped.
+    Radar camera-Z/max_depth, RCS mapped from [-40,40] dBsm, and compensated
+    radial velocity mapped from [-30,30] m/s (positive is receding). RCS and
+    velocity are clipped. This radar attribute choice adapts the paper to
+    nuScenes; its elevation-invariant vertical replication follows the paper.
+    Nearest depth determines the complete attribute tuple at each pixel/column.
+    Missing measurements are zero; inputs never depend on annotations.
     Availability masks are distinct from real zero values and letterbox padding.
     Labels are 1..10; class 0 is reserved for an eventual SSD background class.
     """
     def __init__(self, root, version='v1.0-mini', split='mini_train',
                  cameras=('CAM_FRONT',), image_hw=(384, 640),
-                 min_depth=1.0, max_depth=100.0, nusc=None):
+                 min_depth=1.0, max_depth=100.0, nusc=None, sensor_encoding='depth'):
         self.root = Path(root).expanduser().resolve()
         self.version, self.split = version, split
         self.cameras = tuple(cameras)
         self.image_hw = tuple(image_hw)
         self.min_depth, self.max_depth = min_depth, max_depth
+        if sensor_encoding not in ('depth', 'dhi'):
+            raise ValueError('sensor_encoding must be depth or dhi')
+        self.sensor_encoding = sensor_encoding
         allowed = {'v1.0-mini': ('mini_train', 'mini_val'), 'v1.0-trainval': ('train', 'val')}
         if version not in allowed or split not in allowed[version]:
             raise ValueError('Use mini_train/mini_val with v1.0-mini or train/val with v1.0-trainval')
@@ -62,7 +75,13 @@ class NuScenesFusionDataset(Dataset):
             raise FileNotFoundError(f'Missing {path}. Finish extracting the requested dataset split.')
         return path
 
-    def _project_sensor(self, token, camera_record, intrinsic, original_hw, pixel_transform, output_hw=None):
+    def _project_sensor(self, token, camera_record, intrinsic, original_hw, pixel_transform, output_hw=None,
+                        return_features=False):
+        """Project sensor returns; optionally return aligned [depth, a, b] features.
+
+        The existing two-result projection API remains the default. With
+        return_features=True, results are (uvd, features, metadata).
+        """
         record = self.nusc.get('sample_data', token)
         calibration = self.nusc.get('calibrated_sensor', record['calibrated_sensor_token'])
         sensor = self.nusc.get('sensor', calibration['sensor_token'])
@@ -75,15 +94,40 @@ class NuScenesFusionDataset(Dataset):
                                               dynprop_states=list(range(7)), ambig_states=[3])
         transform = np.linalg.inv(sensor_to_global(self.nusc, camera_record)) @ sensor_to_global(self.nusc, record)
         xyz = transform_points(cloud.points[:3].T, transform)
-        uvd = project_points(xyz, intrinsic, original_hw, self.min_depth, self.max_depth)
+        uvd, point_indices = project_points(xyz, intrinsic, original_hw, self.min_depth, self.max_depth,
+                                           return_indices=True)
         if len(uvd):
             homogeneous = np.column_stack((uvd[:, :2], np.ones(len(uvd))))
             uvd[:, :2] = (homogeneous @ pixel_transform.T)[:, :2]
-        uvd = filter_visible_points(uvd, original_hw if output_hw is None else output_hw)
-        return uvd, {'channel': sensor['channel'], 'token': token,
+        uvd, visible = filter_visible_points(uvd, original_hw if output_hw is None else output_hw,
+                                            return_mask=True)
+        point_indices = point_indices[visible]
+        features = None
+        if return_features:
+            points = cloud.points[:, point_indices].T
+            if sensor['modality'] == 'lidar':
+                sensor_to_ego = transform_matrix(calibration['translation'], Quaternion(calibration['rotation']))
+                height = transform_points(points[:, :3], sensor_to_ego)[:, 2]
+                features = np.column_stack((uvd[:, 2] / self.max_depth,
+                                            np.clip((height + 3.) / 8., 0, 1),
+                                            np.clip(points[:, 3] / 255., 0, 1)))
+            else:
+                # nuScenes fields 8,9 are ego-motion compensated x/y velocity
+                # in the radar sensor frame; project onto that return's ray.
+                distance = np.linalg.norm(points[:, :2], axis=1)
+                radial_velocity = np.divide((points[:, :2] * points[:, 8:10]).sum(axis=1), distance,
+                                            out=np.zeros_like(distance), where=distance > 1e-6)
+                features = np.column_stack((uvd[:, 2] / self.max_depth,
+                                            np.clip((points[:, 5] + 40.) / 80., 0, 1),
+                                            np.clip((radial_velocity + 30.) / 60., 0, 1)))
+            features = features.astype(np.float32)
+            finite = np.isfinite(features).all(axis=1)
+            uvd, features = uvd[finite], features[finite]
+        metadata = {'channel': sensor['channel'], 'token': token,
                      'time_offset_seconds': (record['timestamp'] - camera_record['timestamp']) / 1e6,
                      'sensor_to_camera': transform, 'input_points': cloud.nbr_points(),
                      'projected_points': len(uvd)}
+        return (uvd, features, metadata) if return_features else (uvd, metadata)
 
     def __getitem__(self, index):
         token, channel = self.items[index]
@@ -105,15 +149,33 @@ class NuScenesFusionDataset(Dataset):
         image_mask[:, top:top + resized_h, left:left + resized_w] = True
         affine = np.array([[resized_w / original_w, 0, left], [0, resized_h / original_h, top], [0, 0, 1.]])
         kwargs = (camera, intrinsic, (original_h, original_w), affine, self.image_hw)
-        lidar, lidar_meta = self._project_sensor(sample['data']['LIDAR_TOP'], *kwargs)
-        radar_points, radar_meta = [], []
+        rich_inputs = self.sensor_encoding == 'dhi'
+        if rich_inputs:
+            lidar, lidar_features, lidar_meta = self._project_sensor(sample['data']['LIDAR_TOP'], *kwargs,
+                                                                    return_features=True)
+        else:
+            lidar, lidar_meta = self._project_sensor(sample['data']['LIDAR_TOP'], *kwargs)
+        radar_points, radar_attributes, radar_meta = [], [], []
         for radar in RADARS:
-            projected, metadata = self._project_sensor(sample['data'][radar], *kwargs)
+            if rich_inputs:
+                projected, features, metadata = self._project_sensor(sample['data'][radar], *kwargs,
+                                                                     return_features=True)
+                radar_attributes.append(features)
+            else:
+                projected, metadata = self._project_sensor(sample['data'][radar], *kwargs)
             radar_points.append(projected)
             radar_meta.append(metadata)
         radar = np.concatenate(radar_points, axis=0)
-        lidar_depth, lidar_mask = rasterize_depth(lidar, self.image_hw)
-        radar_depth, radar_mask = rasterize_depth(radar, self.image_hw)
+        if rich_inputs:
+            lidar_input, lidar_mask = rasterize_features(lidar, lidar_features, self.image_hw, image_mask)
+            radar_input, radar_mask = rasterize_features(radar, np.concatenate(radar_attributes),
+                                                         self.image_hw, image_mask, vertical=True)
+            lidar_depth = lidar_input[:1] * self.max_depth
+            radar_depth = radar_input[:1] * self.max_depth
+        else:
+            lidar_depth, lidar_mask = rasterize_depth(lidar, self.image_hw)
+            radar_depth, radar_mask = rasterize_depth(radar, self.image_hw)
+            lidar_input, radar_input = lidar_depth / self.max_depth, radar_depth / self.max_depth
         global_to_camera = np.linalg.inv(sensor_to_global(self.nusc, camera))
         boxes, labels, annotations = [], [], []
         for annotation_token in sample['anns']:
@@ -141,8 +203,8 @@ class NuScenesFusionDataset(Dataset):
         ego_to_global = transform_matrix(pose['translation'], Quaternion(pose['rotation']))
         return {
             'camera': torch.from_numpy(rgb),
-            'lidar': torch.from_numpy(lidar_depth / self.max_depth),
-            'radar': torch.from_numpy(radar_depth / self.max_depth),
+            'lidar': torch.from_numpy(lidar_input),
+            'radar': torch.from_numpy(radar_input),
             'camera_mask': torch.from_numpy(image_mask),
             'lidar_mask': torch.from_numpy(lidar_mask),
             'radar_mask': torch.from_numpy(radar_mask),
@@ -153,7 +215,8 @@ class NuScenesFusionDataset(Dataset):
             'metadata': {'sample_token': token, 'scene_token': sample['scene_token'], 'camera_channel': channel,
                          'camera_token': camera['token'], 'camera_path': str(self._path(camera)),
                          'camera_timestamp': camera['timestamp'], 'original_hw': (original_h, original_w),
-                         'image_hw': self.image_hw, 'intrinsic_original': intrinsic,
+                         'image_hw': self.image_hw, 'sensor_encoding': self.sensor_encoding,
+                         'intrinsic_original': intrinsic,
                          'intrinsic': affine @ intrinsic, 'pixel_transform': affine,
                          'global_to_camera': global_to_camera, 'ego_to_global': ego_to_global, 'sensors': [lidar_meta, *radar_meta]},
             'projections': {'lidar': torch.from_numpy(lidar), 'radar': torch.from_numpy(radar)}
