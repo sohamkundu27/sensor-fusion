@@ -104,18 +104,21 @@ class ProgressiveFeatureExchange(nn.Module):
         self.feedback = nn.ModuleList([nn.Conv2d(out_channels, c, 1, bias=False) for c in channels])
 
     def forward(self, features, entropies, available):
-        features = [x.masked_fill(~available[:, i, None, None, None], 0) for i, x in enumerate(features)]
-        joint = torch.cat(features, dim=1)
-        if self.gate is not None:
-            condition = torch.cat([F.interpolate(entropy, size=joint.shape[-2:], mode='bilinear', align_corners=False)
-                                   * available[:, i, None, None, None] for i, entropy in enumerate(entropies)], dim=1)
-            joint = torch.cat((joint * self.gate(condition).sigmoid(), condition), dim=1)
-        fused = self.project(joint)
-        fused = fused.masked_fill(~available.any(1)[:, None, None, None], 0)
-        updated = [(feature + self.residual_scale * feedback(fused)).masked_fill(
-                    ~available[:, i, None, None, None], 0)
-                   for i, (feature, feedback) in enumerate(zip(features, self.feedback))]
-        return updated, fused
+        # Frozen-BN camera activations can exceed FP16 range before normalization.
+        # Keep both the joint convolution and residual exchange in FP32.
+        with torch.autocast(device_type=features[0].device.type, enabled=False):
+            features = [x.float().masked_fill(~available[:, i, None, None, None], 0) for i, x in enumerate(features)]
+            joint = torch.cat(features, dim=1)
+            if self.gate is not None:
+                condition = torch.cat([F.interpolate(entropy, size=joint.shape[-2:], mode='bilinear', align_corners=False)
+                                       * available[:, i, None, None, None] for i, entropy in enumerate(entropies)], dim=1)
+                joint = torch.cat((joint * self.gate(condition).sigmoid(), condition), dim=1)
+            fused = self.project(joint)
+            fused = fused.masked_fill(~available.any(1)[:, None, None, None], 0)
+            updated = [(feature + self.residual_scale * feedback(fused)).masked_fill(
+                        ~available[:, i, None, None, None], 0)
+                       for i, (feature, feedback) in enumerate(zip(features, self.feedback))]
+            return updated, fused
 
 
 class ReimplementedEntropyFusionDetector(nn.Module):
@@ -144,11 +147,17 @@ class ReimplementedEntropyFusionDetector(nn.Module):
         entropies = [self.entropy(x, m) for x, m in zip(inputs, masks)] if self.fusion_mode == 'entropy' else None
         inputs[0] = ((inputs[0] - self.mean) / self.std) * masks[0]
         networks = (self.camera, self.lidar, self.radar)
-        streams = [net.stem(x).masked_fill(~available[:, i, None, None, None], 0)
+        def run_stage(module, value, camera=False):
+            if camera:
+                # Prevent overflowing camera features before they reach exchange.
+                with torch.autocast(device_type=value.device.type, enabled=False):
+                    return module(value.float())
+            return module(value)
+        streams = [run_stage(net.stem, x, camera=i == 0).masked_fill(~available[:, i, None, None, None], 0)
                    for i, (net, x) in enumerate(zip(networks, inputs))]
         fused = []
         for level, exchange in enumerate(self.exchange):
-            streams = [net.stages[level](x) for net, x in zip(networks, streams)]
+            streams = [run_stage(net.stages[level], x, camera=i == 0) for i, (net, x) in enumerate(zip(networks, streams))]
             streams, context = exchange(streams, entropies, available)
             fused.append(context)
         # Physical depth must follow sensor dropout too; otherwise the head can

@@ -64,7 +64,8 @@ it. Cross-view suppression still uses global ground-plane distance.
 
 `configs/paper_v2.json` selects the new architecture explicitly. Training uses
 all six cameras, 384x640 inputs, ImageNet ResNet18 camera initialization, random
-sensor branches, batch two, one optimizer update per batch (effective batch two), AMP,
+sensor branches, batch two, one optimizer update per batch (effective batch two),
+selective AMP (FP32 camera backbone and feature exchange; AMP sensor branches/head),
 AdamW at 2e-4 with 1,000-step warmup and a 20-epoch cosine schedule, weight decay
 0.0005, and camera brightness/contrast augmentation. The added metric-center
 loss weight ramps from 0.05 to 0.25 over the first 5,000 batches, giving early
@@ -151,3 +152,21 @@ step-1,000 checkpoint reopened with finite weights and the selected recipe
 GPU utilization was sampled at 75%, temperature 53 C. Local verification is in
 `outputs/paper_v2_full_20260914/startup_verification.json`. These observations
 confirm startup only; inspect live metrics and validation for current progress.
+
+## FP16 failure and recovery
+
+The first full attempt stopped at batch 6,592 with a nonfinite loss; the saved
+step-6,000 checkpoint was intact. Replaying updates from that checkpoint reproduced
+the failure exactly. Inputs were finite, but the third exchange block's joint
+convolution overflowed FP16 before GroupNorm could normalize its output. Its input
+had maximum absolute magnitude 11,114.625. The same failed batch and weights gave
+finite loss and gradients in FP32, with no new kernel or NVIDIA driver faults.
+
+The camera backbone and all progressive exchange operations now run in FP32;
+sensor branches and the detection head retain AMP. This preserves parameter shapes
+and optimizer/checkpoint compatibility, but changes the numerical trajectory and
+runtime. The original failed batch now passes with finite loss (5.7405) and finite
+gradients under selective AMP. CUDA regression tests reproduce the original
+convolution overflow and verify finite outputs/gradients with the fix for both
+entropy and concatenation modes. All 32 tests passed. Future nonfinite losses save
+a separate diagnostic batch/model snapshot without overwriting the last checkpoint.

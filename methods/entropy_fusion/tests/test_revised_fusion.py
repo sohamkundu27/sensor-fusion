@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from models.revised import MeasurementEntropy, ProgressiveFeatureExchange, drop_independent_modalities
@@ -66,3 +67,32 @@ def test_concat_ablation_has_progressive_exchange_without_entropy_conditioning()
     assert block.gate is None and fused.shape == (1, 16, 4, 4)
     updated[0].square().mean().backward()
     assert features[1].grad.abs().sum() > 0
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='FP16 CUDA regression')
+@pytest.mark.parametrize('fusion_mode', ['entropy', 'concat'])
+def test_exchange_survives_activations_that_overflow_fp16_convolution(fusion_mode):
+    block = ProgressiveFeatureExchange((8, 8, 8), out_channels=16, fusion_mode=fusion_mode).cuda()
+    with torch.no_grad():
+        block.project[0].weight.fill_(.25)
+        if block.gate is not None:
+            block.gate.weight.zero_()
+            block.gate.bias.zero_()
+    features = [torch.full((1, 8, 4, 4), 10000., device='cuda', requires_grad=True) for _ in range(3)]
+    entropies = [torch.zeros(1, 4, 4, 4, device='cuda') for _ in range(3)]
+    available = torch.tensor([[True, True, False]], device='cuda')
+    # This reproduces the failure mechanism: finite inputs overflow inside the
+    # joint convolution, before GroupNorm can reduce their magnitude.
+    joint = torch.cat((features[0], features[1], features[2] * 0), dim=1)
+    if block.gate is not None:
+        joint = torch.cat((joint * .5, *entropies), dim=1)
+    with torch.autocast('cuda', dtype=torch.float16):
+        assert not torch.isfinite(block.project[0](joint)).all()
+        updated, fused = block(features, entropies, available)
+        loss = fused.square().mean() + updated[0].square().mean()
+    assert fused.dtype == torch.float32
+    assert all(torch.isfinite(value).all() for value in (*updated, fused))
+    assert not updated[2].any()
+    loss.backward()
+    assert all(torch.isfinite(value.grad).all() for value in features)
+    assert all(torch.isfinite(parameter.grad).all() for parameter in block.parameters() if parameter.grad is not None)
