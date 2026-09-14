@@ -1,5 +1,7 @@
 """Train the entropy-gated 3D baseline; supports bounded benchmarks and resume."""
 import argparse
+import faulthandler
+import signal
 from collections import deque
 import json
 import random
@@ -62,6 +64,10 @@ def parse_args():
 
 
 def main():
+    # Allow thread diagnostics on a live Linux job without debugger attachment.
+    faulthandler.enable()
+    if hasattr(signal, 'SIGUSR1'):
+        faulthandler.register(signal.SIGUSR1, all_threads=True)
     args = parse_args()
     device = torch.device(args.device)
     torch.set_num_threads(8)
