@@ -28,7 +28,8 @@ from the mini baseline. Successful startup does not establish final accuracy.
 
 The job runs in the user service `entropy-fusion-full.service`. User lingering was
 enabled so logging out does not stop the service. The machine must remain powered
-on; the service does not automatically resume after a reboot. Automatic AC idle
+on. The original transient service did not resume after reboot; the persistent
+recovery unit added below is now configured to do so. Automatic AC idle
 sleep timeout was already set to zero at launch. Manual suspend or shutdown will
 interrupt execution.
 
@@ -95,3 +96,27 @@ for current status.
 The initial planning estimate is 2–3 days including validation. Re-estimate from
 sustained full-data throughput; no completion or accuracy guarantee is implied.
 The earlier mini run achieved only 4.76% mAP, so this remains an exploratory run.
+
+## September 13 kernel stall — reboot pending
+
+At 20:25:28 CDT, training stopped advancing at step 341,110 in epoch 3.
+The kernel journal records a supervisor-mode page fault in `folio_mark_dirty`
+while a `pt_data_worker` was unmapping memory, at that same timestamp. Later
+messages report CPU soft lockups during worker cleanup. The cause of the kernel
+fault is not established; it should not be attributed to a specific driver,
+package or hardware component without further investigation. Restarting the
+service did not restore training. A running service alone is not evidence of
+progress. The saved local journal is `outputs/full_20epoch_20260913/kernel_stall_20260913.log`.
+
+The step-341,000 checkpoint was reopened successfully and its model tensors were
+finite. Recovery will replay 110 updates. Epoch 1 full-validation results are
+10.77% mAP and 18.77% NDS. The experiment has not finished.
+
+A persistent user unit has now been written to
+`~/.config/systemd/user/entropy-fusion-full.service` and linked into
+`default.target.wants`, replacing reliance on a transient unit after reboot.
+With user lingering enabled, it is configured to resume this checkpoint and the
+scheduled validations when the user service manager starts after reboot. This
+post-reboot recovery has not yet been verified. Save open work and reboot the
+machine, then verify fresh step records beyond 341,110 and a new checkpoint.
+Commit `2f94216` adds SIGUSR1 thread dumps to the training log for future diagnosis.
