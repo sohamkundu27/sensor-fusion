@@ -21,7 +21,7 @@ class FeatureExchange(nn.Module):
         return self.project(torch.cat(gated, dim=1))
 
 
-def drop_modalities(inputs, masks, probability, training):
+def drop_modalities(inputs, masks, probability, training, available_only=False):
     """With probability p per sample, drop exactly one uniformly chosen stream."""
     if not 0 <= probability <= 1:
         raise ValueError('Dropout probability must be between zero and one')
@@ -30,7 +30,12 @@ def drop_modalities(inputs, masks, probability, training):
     if training and probability:
         # Never intentionally remove the final naturally available modality.
         eligible = (available.sum(1) > 1) & (torch.rand(batch, device=inputs[0].device) < probability)
-        choice = torch.randint(3, (batch,), device=inputs[0].device)
+        if available_only:
+            weights = available.float()
+            weights[~available.any(1), 0] = 1  # No-op choice for entirely absent inputs.
+            choice = torch.multinomial(weights, 1)[:, 0]
+        else:
+            choice = torch.randint(3, (batch,), device=inputs[0].device)
         keep = torch.ones_like(available)
         keep[torch.arange(batch, device=choice.device), choice] = ~eligible
         available = available & keep

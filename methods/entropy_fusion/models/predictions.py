@@ -42,7 +42,7 @@ def metric_nms(code, anchors, scores, labels, metadata, topk):
 
 
 @torch.no_grad()
-def decode_predictions(prediction, metadata, score_threshold=.05, topk=100):
+def decode_predictions(prediction, metadata, score_threshold=.05, topk=100, include_boxes2d=False):
     output = []
     for i, meta in enumerate(metadata):
         scores, labels = prediction['logits'][i].float().softmax(-1)[:, 1:].max(-1)
@@ -70,6 +70,8 @@ def decode_predictions(prediction, metadata, score_threshold=.05, topk=100):
             records.append(dict(sample_token=meta['sample_token'], translation=xyz[j].tolist(),
                                 size=sizes[j].tolist(), rotation=rotations[j], velocity=velocity[j].tolist(),
                                 detection_name=name, detection_score=float(scores[index]), attribute_name=attribute))
+            if include_boxes2d:
+                records[-1]['box2d'] = boxes[keep[j]].tolist()
         output.append(records)
     return output
 

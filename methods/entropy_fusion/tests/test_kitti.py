@@ -84,3 +84,25 @@ def test_remote_reader_rejects_server_ignoring_range(monkeypatch):
     reader = RemoteZipReader('https://example.test/archive.zip')
     with pytest.raises(IOError,match='exact byte range'):
         reader.read(1)
+
+
+def test_dropout_samples_only_available_kitti_sensors():
+    from models.fusion import drop_modalities
+    torch.manual_seed(42)
+    inputs = [torch.ones(10000,1,1,1) for _ in range(3)]
+    masks = [torch.ones(10000,1,1,1,dtype=torch.bool) for _ in range(2)]+[torch.zeros(10000,1,1,1,dtype=torch.bool)]
+    _,_,available = drop_modalities(inputs,masks,.5,True,available_only=True)
+    assert not available[:,2].any() and available.any(1).all()
+    assert abs(float((available.sum(1)==1).float().mean())-.5)<.02
+
+
+def test_kitti_export_recovers_label_frame_and_unletterboxed_pixels():
+    from eval_kitti import kitti_detection_line
+    from pyquaternion import Quaternion
+    record = dict(translation=[20,-2,-1],size=[2,4,2],rotation=Quaternion(axis=[0,0,1],radians=-np.pi/2).elements,
+                  box2d=[20,40,100,80],detection_score=.9)
+    meta = dict(pixel_transform=np.array([[.5,0,0],[0,.5,20],[0,0,1]]),original_hw=(200,400))
+    fields = kitti_detection_line(record,meta).split()
+    assert fields[0]=='Car'
+    assert np.allclose(np.array(fields[4:8],float),[40,40,200,120])
+    assert np.allclose(np.array(fields[8:15],float),[2,2,4,2,2,20,0])

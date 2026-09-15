@@ -15,6 +15,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--dataset', choices=['nuscenes','kitti'], default='nuscenes')
     parser.add_argument('--config', type=Path, help='Training configuration; stored in checkpoints')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--resume-if-present', action='store_true', help='Start fresh or resume a checkpoint in this experiment directory')
@@ -24,6 +25,7 @@ def main():
     parser.add_argument('--minimum-first-map', type=float, default=0., help='Stop after epoch-one validation if mAP is below this experimental floor')
     parser.add_argument('--validate-every', type=int, default=5)
     args = parser.parse_args()
+    metric_key = 'mAP' if args.dataset == 'nuscenes' else 'car_3d_AP_R40_moderate'
     if not 0 <= args.minimum_first_map <= 1:
         parser.error('Minimum mAP must be between zero and one')
     if args.epochs < 1 or args.validate_every < 1:
@@ -35,7 +37,7 @@ def main():
         raise FileExistsError('Choose an empty experiment directory or use --resume')
     status = dict(state='starting', pid=os.getpid(), started_utc=datetime.now(timezone.utc).isoformat(),
                   git_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip(),
-                  epochs=args.epochs, validation=[], output=str(output))
+                  epochs=args.epochs, validation=[], output=str(output), dataset=args.dataset, selection_metric=metric_key)
     elapsed_offset = 0.
     resume_epoch, resume_cursor = 0, 0
     if args.resume:
@@ -49,7 +51,9 @@ def main():
         if old['epochs'] != args.epochs:
             raise ValueError('Resume requires the original epoch target')
         checkpoint = torch.load(output/'training/last.pt', map_location='cpu', weights_only=False)
-        if checkpoint['config']['version'] != 'v1.0-trainval' or Path(checkpoint['config']['root']).resolve() != Path(args.root).resolve():
+        expected_version = 'v1.0-trainval' if args.dataset == 'nuscenes' else None
+        if (checkpoint['config'].get('dataset','nuscenes') != args.dataset or checkpoint['config']['version'] != expected_version
+                or Path(checkpoint['config']['root']).expanduser().resolve() != Path(args.root).expanduser().resolve()):
             raise ValueError('Checkpoint dataset differs from the requested dataset')
         step = checkpoint['step']
         resume_epoch, resume_cursor = checkpoint['epoch'], checkpoint['batch_cursor']
@@ -88,9 +92,9 @@ def main():
             stream.flush()
             subprocess.run([sys.executable, '-u', *command], cwd=REPO, stdout=stream, stderr=subprocess.STDOUT, check=True)
     stages = sorted({1, args.epochs, *range(args.validate_every, args.epochs+1, args.validate_every)})
-    best = max((v['mAP'] for v in status['validation']), default=-1.)
+    best = max((v[metric_key] for v in status['validation']), default=-1.)
     try:
-        if any(v['epoch'] == 1 and v['mAP'] < args.minimum_first_map for v in status['validation']):
+        if any(v['epoch'] == 1 and v[metric_key] < args.minimum_first_map for v in status['validation']):
             raise RuntimeError('Recorded epoch-one mAP is below configured floor; inspect results before lowering the floor')
         for stage in stages:
             if any(v['epoch'] == stage for v in status['validation']):
@@ -100,7 +104,9 @@ def main():
             if historical and not checkpoint.exists():
                 raise RuntimeError(f'Missing historical checkpoint for unevaluated epoch {stage}')
             update(state='training', target_epoch=stage)
-            command = ['train.py', '--device', 'cuda', '--epochs', str(stage), '--output', str(output/'training'), '--version', 'v1.0-trainval', '--split', 'train', '--root', args.root, '--checkpoint-every', '1000']
+            command = ['train.py', '--device', 'cuda', '--dataset', args.dataset, '--epochs', str(stage), '--output', str(output/'training'), '--split', 'train', '--root', args.root, '--checkpoint-every', '1000']
+            if args.dataset == 'nuscenes':
+                command += ['--version', 'v1.0-trainval']
             if args.config:
                 command += ['--config', str(args.config.resolve())]
             if (output/'training/last.pt').exists():
@@ -110,17 +116,27 @@ def main():
                 shutil.copy2(output/'training/last.pt', checkpoint)
             update(state='evaluating', completed_epochs=stage)
             eval_dir = output/f'eval_epoch_{stage:02}'
-            run(['eval.py', '--device', 'cuda', '--root', args.root, '--split', 'val', '--checkpoint', str(checkpoint), '--output', str(eval_dir)], output/f'eval_epoch_{stage:02}.log')
-            metrics = json.loads((eval_dir/'metrics_summary.json').read_text())
-            record = dict(epoch=stage, mAP=metrics['mean_ap'], NDS=metrics['nd_score'], checkpoint=str(checkpoint))
+            if args.dataset == 'nuscenes':
+                run(['eval.py', '--device', 'cuda', '--root', args.root, '--split', 'val', '--checkpoint', str(checkpoint), '--output', str(eval_dir)], output/f'eval_epoch_{stage:02}.log')
+                metrics = json.loads((eval_dir/'metrics_summary.json').read_text())
+                record = dict(epoch=stage, mAP=metrics['mean_ap'], NDS=metrics['nd_score'], checkpoint=str(checkpoint))
+            else:
+                if eval_dir.exists():
+                    # Preserve a partial evaluation from an interrupted attempt.
+                    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+                    eval_dir.rename(eval_dir.with_name(eval_dir.name+'_before_resume_'+stamp))
+                run(['eval_kitti.py', '--root', args.root, '--checkpoint', str(checkpoint), '--output', str(eval_dir)], output/f'eval_epoch_{stage:02}.log')
+                metrics = json.loads((eval_dir/'metrics.json').read_text())
+                record = dict(epoch=stage, car_3d_AP_R40_moderate=metrics['car_AP_R40_percent']['3d']['moderate']/100,
+                              car_AP_R40_percent=metrics['car_AP_R40_percent'],checkpoint=str(checkpoint))
             status['validation'].append(record)
-            if record['mAP'] > best:
-                best = record['mAP']
+            if record[metric_key] > best:
+                best = record[metric_key]
                 shutil.copy2(checkpoint, output/'best.pt')
-                status['best_epoch'], status['best_mAP'] = stage, best
+                status['best_epoch'], status['best_'+metric_key] = stage, best
             update(state='stage_complete')
-            if stage == 1 and record['mAP'] < args.minimum_first_map:
-                raise RuntimeError(f"Epoch-one mAP {record['mAP']:.4f} is below configured floor {args.minimum_first_map:.4f}; inspect before spending more training time")
+            if stage == 1 and record[metric_key] < args.minimum_first_map:
+                raise RuntimeError(f"Epoch-one {metric_key} {record[metric_key]:.4f} is below configured floor {args.minimum_first_map:.4f}; inspect before spending more training time")
         update(state='completed', finished_utc=datetime.now(timezone.utc).isoformat())
     except BaseException as error:
         update(state='failed', error=f'{type(error).__name__}: {error}')

@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from data import NuScenesFusionDataset, collate_fusion_batch, CAMERAS
+from data.kitti_dataset import KittiFusionDataset
 from models.factory import build_model
 from models.losses import detection_loss
 
@@ -35,7 +36,9 @@ def parse_args():
     known, _ = pre.parse_known_args()
     parser = argparse.ArgumentParser(description=__doc__, parents=[pre])
     parser.add_argument('--model-variant', choices=['baseline', 'paper_v2'], default='baseline')
-    parser.add_argument('--dropout-mode', choices=['single','independent'], default='independent')
+    parser.add_argument('--dataset', choices=['nuscenes','kitti'], default='nuscenes')
+    parser.add_argument('--num-classes', type=int, default=10)
+    parser.add_argument('--dropout-mode', choices=['single','single_available','independent'], default='independent')
     parser.add_argument('--center-warmup-steps', type=int, default=0)
     parser.add_argument('--fusion-mode', choices=['entropy', 'concat'], default='entropy')
     parser.add_argument('--sensor-encoding', choices=['depth', 'dhi'], default='depth')
@@ -75,6 +78,10 @@ def parse_args():
         parser.error('baseline requires --sensor-encoding depth')
     if args.model_variant == 'paper_v2' and args.sensor_encoding != 'dhi':
         parser.error('paper_v2 requires --sensor-encoding dhi')
+    if args.dataset == 'kitti' and (args.model_variant != 'paper_v2' or args.num_classes != 1 or args.version is not None or args.split != 'train'):
+        parser.error('KITTI requires paper_v2, num_classes=1, version=null and split=train; use configs/kitti.json')
+    if args.dataset == 'nuscenes' and args.num_classes != 10:
+        parser.error('nuScenes requires 10 foreground classes')
     if (args.model_variant == 'paper_v2' and args.schedule_epochs < args.epochs) or args.warmup_steps < 0 or args.weight_decay < 0:
         parser.error('Schedule must cover training, with nonnegative warmup/weight decay')
     return args
@@ -97,14 +104,18 @@ def main():
     if checkpoint:
         if checkpoint.get('format_version') != 1:
             raise ValueError('Checkpoint predates the camera-relative 3D encoding')
+        for key, default in [('dataset','nuscenes'), ('num_classes',10)]:
+            if checkpoint['config'].get(key, default) != config[key]:
+                raise ValueError(f'Resume setting differs: {key}')
         for key, default in [('model_variant','baseline'), ('fusion_mode','entropy'), ('sensor_encoding','depth'), ('weight_decay',.01), ('schedule_epochs',20), ('warmup_steps',1000), ('dropout_mode','independent'), ('center_warmup_steps',0), ('worker_start_method','fork'), ('photometric_augmentation',False)]:
             if checkpoint['config'].get(key, default) != config[key]:
                 raise ValueError(f'Resume setting differs: {key}')
         for key in ('version', 'split', 'cameras', 'image_hw', 'batch_size', 'lr', 'amp', 'seed', 'accumulation_steps', 'modality_dropout'):
             if checkpoint['config'][key] != config[key]:
                 raise ValueError(f'Resume setting differs: {key}. Use the original training settings.')
-    dataset = NuScenesFusionDataset(args.root, version=args.version, split=args.split,
-                                   cameras=args.cameras, image_hw=args.image_hw, sensor_encoding=args.sensor_encoding)
+    dataset = (KittiFusionDataset(args.root, split=args.split, image_hw=args.image_hw) if args.dataset == 'kitti' else
+               NuScenesFusionDataset(args.root, version=args.version, split=args.split,
+                                     cameras=args.cameras, image_hw=args.image_hw, sensor_encoding=args.sensor_encoding))
     model = build_model(config, pretrained=not args.no_pretrained and checkpoint is None).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scaler = torch.amp.GradScaler('cuda', enabled=args.amp, init_scale=1024.)

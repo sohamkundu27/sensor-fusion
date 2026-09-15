@@ -127,7 +127,7 @@ class ReimplementedEntropyFusionDetector(nn.Module):
         from .revised_head import RevisedDetectionHead
         self.modality_dropout = modality_dropout
         self.dropout_mode = dropout_mode
-        if dropout_mode not in ('single','independent'):
+        if dropout_mode not in ('single','single_available','independent'):
             raise ValueError('Unknown modality dropout mode')
         self.fusion_mode = fusion_mode
         self.camera = CameraBackbone(pretrained)
@@ -142,8 +142,11 @@ class ReimplementedEntropyFusionDetector(nn.Module):
     def forward(self, batch):
         inputs = [batch[k] for k in ('camera', 'lidar', 'radar')]
         masks = [batch[k + '_mask'] for k in ('camera', 'lidar', 'radar')]
-        dropout = drop_modalities if self.dropout_mode == 'single' else drop_independent_modalities
-        inputs, masks, available = dropout(inputs, masks, self.modality_dropout, self.training)
+        if self.dropout_mode == 'single_available':
+            inputs, masks, available = drop_modalities(inputs, masks, self.modality_dropout, self.training, available_only=True)
+        else:
+            dropout = drop_modalities if self.dropout_mode == 'single' else drop_independent_modalities
+            inputs, masks, available = dropout(inputs, masks, self.modality_dropout, self.training)
         entropies = [self.entropy(x, m) for x, m in zip(inputs, masks)] if self.fusion_mode == 'entropy' else None
         inputs[0] = ((inputs[0] - self.mean) / self.std) * masks[0]
         networks = (self.camera, self.lidar, self.radar)
