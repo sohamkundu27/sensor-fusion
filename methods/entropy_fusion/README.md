@@ -12,8 +12,11 @@ throughout feature extraction. It uses LiDAR depth, height and intensity; radar
 depth, reflectivity and compensated velocity; and a six-scale SSD head with
 metric 3D supervision. The original completed full nuScenes baseline achieved
 15.91% mAP and 24.17% NDS. The [paper-informed revision](docs/REIMPLEMENTATION.md)
-addresses identified fusion, localization and small-object limitations; its
-accuracy and adverse-weather robustness still require evaluation.
+achieved 21.96% mAP and 28.60% NDS at its best validation checkpoint, epoch 15.
+Entropy's contribution and adverse-weather robustness still require controlled
+evaluation. The [Seeing Through Fog experiment](docs/SEEING_THROUGH_FOG.md) is
+being prepared with the paper's four sensor modalities; full dataset access is
+pending registration and the public split overlaps need resolution.
 
 See the [architecture and design choices](docs/MODEL_PLAN.md),
 [data contract](docs/DATA_PIPELINE.md), [training instructions](docs/TRAINING.md),

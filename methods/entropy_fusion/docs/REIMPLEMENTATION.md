@@ -1,5 +1,11 @@
 # Paper-informed nuScenes reimplementation
 
+**Completed September 15, 2026 at 10:39 CDT:** all 20 epochs and scheduled
+validation finished. Best checkpoint is epoch 15 (`best.pt`): **21.96% mAP /
+28.60% NDS**. Epoch 20 scored 21.62% / 28.49%. The next
+[Seeing Through Fog experiment](SEEING_THROUGH_FOG.md) is in preparation;
+the historical startup and recovery notes below describe earlier checks.
+
 This revision follows a direct reading of `../entropyfusion.pdf` (Bijelic et al.,
 CVPR 2020) and its [official supplement](https://www.cs.princeton.edu/~fheide/AdverseWeatherFusion/figures/AdverseWeatherFusion_Supplement.pdf).
 It implements the paper's progressive, entropy-steered image-plane fusion idea
