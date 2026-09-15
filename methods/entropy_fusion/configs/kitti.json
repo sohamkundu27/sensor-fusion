@@ -8,7 +8,7 @@
   "version": null,
   "split": "train",
   "cameras": null,
-  "image_hw": [384, 640],
+  "image_hw": [384, 1248],
   "batch_size": 2,
   "workers": 2,
   "worker_start_method": "spawn",

@@ -1,0 +1,10 @@
+[Unit]
+Description=Wait for KITTI data and train the entropy-fusion car experiment
+
+[Service]
+Type=simple
+WorkingDirectory=%h/sensor-fusion/methods/entropy_fusion
+Environment=OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+ExecStart=%h/venvs/entropy-fusion/bin/python -u -m scripts.run_kitti_when_ready --root %h/data/kitti_full --output %h/sensor-fusion/methods/entropy_fusion/outputs/kitti_full_20260915
+KillMode=control-group
+TimeoutStopSec=60
