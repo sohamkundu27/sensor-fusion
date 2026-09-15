@@ -4,3 +4,4 @@ torch==2.9.1
 torchvision==0.24.1
 Pillow>=10,<13
 pytest==8.4.2
+requests==2.34.2

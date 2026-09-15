@@ -16,6 +16,7 @@ import time
 import urllib.request
 import zipfile
 import zlib
+import requests
 
 BASE = 'https://s3.eu-central-1.amazonaws.com/avg-kitti/'
 ARCHIVES = {'image_2': 'png', 'velodyne': 'bin', 'calib': 'txt', 'label_2': 'txt'}
@@ -24,7 +25,10 @@ ARCHIVES = {'image_2': 'png', 'velodyne': 'bin', 'calib': 'txt', 'label_2': 'txt
 class RemoteZipReader(io.RawIOBase):
     def __init__(self, url):
         self.url, self.position, self.transferred = url, 0, 0
-        with urllib.request.urlopen(urllib.request.Request(url, method='HEAD'), timeout=60) as r:
+        self.session = requests.Session()
+        self.session.headers.update({'Accept-Encoding':'identity'})
+        with self.session.head(url, timeout=60) as r:
+            r.raise_for_status()
             self.size = int(r.headers['Content-Length'])
             self.etag = r.headers['ETag']
         self.cache_start, self.cache = 0, b''
@@ -32,6 +36,10 @@ class RemoteZipReader(io.RawIOBase):
     def readable(self): return True
     def seekable(self): return True
     def tell(self): return self.position
+
+    def close(self):
+        self.session.close()
+        super().close()
 
     def seek(self, offset, whence=0):
         if whence not in (0,1,2): raise ValueError('Invalid seek mode')
@@ -46,12 +54,12 @@ class RemoteZipReader(io.RawIOBase):
         if count > 64*1024**2: raise ValueError('Refusing unbounded archive read')
         start, end = self.position, self.position+count
         if not (self.cache_start <= start and end <= self.cache_start+len(self.cache)):
-            stop = min(self.size, max(end, start+1024**2))
-            request = urllib.request.Request(self.url, headers={'Range': f'bytes={start}-{stop-1}', 'If-Match': self.etag})
-            with urllib.request.urlopen(request, timeout=120) as response:
-                if response.status != 206 or response.headers.get('Content-Range') != f'bytes {start}-{stop-1}/{self.size}':
+            stop = min(self.size, max(end, start+4*1024**2))
+            headers = {'Range': f'bytes={start}-{stop-1}', 'If-Match': self.etag}
+            with self.session.get(self.url, headers=headers, timeout=(30,120), stream=True) as response:
+                if response.status_code != 206 or response.headers.get('Content-Range') != f'bytes {start}-{stop-1}/{self.size}':
                     raise IOError('Server did not honor exact byte range; refusing full archive download')
-                data = response.read(stop-start+1)
+                data = response.raw.read(stop-start+1)
             if len(data) != stop-start: raise IOError('Truncated range response')
             self.transferred += len(data)
             self.cache_start, self.cache = start, data
@@ -63,7 +71,7 @@ def fetch_archive(root, folder, extension, ids):
     url = BASE+f'data_object_{folder}.zip'
     reader = RemoteZipReader(url)
     # Calibration/label ZIPs are small. Cache them once instead of repeatedly
-    # fetching 1 MiB ranges for hundreds of tiny, noncontiguous entries.
+    # fetching ranges for hundreds of tiny, noncontiguous entries.
     if reader.size <= 64*1024**2:
         reader.read(reader.size)
         reader.seek(0)

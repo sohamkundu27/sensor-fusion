@@ -63,13 +63,17 @@ def test_remote_zip_range_reader_extracts_without_reading_entire_archive(monkeyp
     class Response(io.BytesIO):
         def __init__(self,data,status,headers):
             super().__init__(data)
-            self.status,self.headers = status,headers
-    def open_request(request,timeout):
-        if request.get_method() == 'HEAD':
+            self.status_code,self.headers,self.raw = status,headers,self
+        def raise_for_status(self): pass
+    class Session:
+        def __init__(self): self.headers = {}
+        def close(self): pass
+        def head(self,url,timeout):
             return Response(b'',200,{'Content-Length':str(len(payload)),'ETag':'test'})
-        start,end = map(int,request.get_header('Range').removeprefix('bytes=').split('-'))
-        return Response(payload[start:end+1],206,{'Content-Range':f'bytes {start}-{end}/{len(payload)}'})
-    monkeypatch.setattr('urllib.request.urlopen',open_request)
+        def get(self,url,headers,timeout,stream):
+            start,end = map(int,headers['Range'].removeprefix('bytes=').split('-'))
+            return Response(payload[start:end+1],206,{'Content-Range':f'bytes {start}-{end}/{len(payload)}'})
+    monkeypatch.setattr('scripts.download_kitti_subset.requests.Session',Session)
     reader = RemoteZipReader('https://example.test/archive.zip')
     with zipfile.ZipFile(reader) as archive:
         assert archive.read('wanted.txt') == b'camera lidar'
@@ -78,9 +82,15 @@ def test_remote_zip_range_reader_extracts_without_reading_entire_archive(monkeyp
 
 def test_remote_reader_rejects_server_ignoring_range(monkeypatch):
     class Response(io.BytesIO):
-        status = 200
+        status_code = 200
         headers = {'Content-Length':'100','ETag':'test'}
-    monkeypatch.setattr('urllib.request.urlopen',lambda *a,**kw:Response(b'x'*100))
+        def raise_for_status(self): pass
+    class Session:
+        def __init__(self): self.headers = {}
+        def close(self): pass
+        def head(self,*a,**kw): return Response(b'')
+        def get(self,*a,**kw): return Response(b'x'*100)
+    monkeypatch.setattr('scripts.download_kitti_subset.requests.Session',Session)
     reader = RemoteZipReader('https://example.test/archive.zip')
     with pytest.raises(IOError,match='exact byte range'):
         reader.read(1)
