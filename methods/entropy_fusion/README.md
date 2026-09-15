@@ -18,6 +18,11 @@ evaluation. The [Seeing Through Fog experiment](docs/SEEING_THROUGH_FOG.md) is
 being prepared with the paper's four sensor modalities; full dataset access is
 pending registration and the public split overlaps need resolution.
 
+The interim [KITTI experiment](docs/KITTI_EXPERIMENT.md) uses camera and LiDAR
+for car-only 3D detection, with KITTI 2D/BEV/3D AP_R40 evaluation. Its small-data
+pipeline and learning checks are verified; the full labeled dataset is downloading
+before the queued training experiment starts.
+
 See the [architecture and design choices](docs/MODEL_PLAN.md),
 [data contract](docs/DATA_PIPELINE.md), [training instructions](docs/TRAINING.md),
 and [measured checks](docs/PRECHECK_RESULTS.md). [TransFusion](../transfusion/)

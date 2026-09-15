@@ -16,6 +16,10 @@ The [Waymo Open Dataset Perception dataset](https://waymo.com/open/) provides ca
 
 [Seeing Through Fog](https://github.com/princeton-computational-imaging/SeeingThroughFog) contains synchronized camera, gated near-infrared, LiDAR and radar measurements in clear weather, fog, snow and rain, with object annotations and scene metadata. We are preparing it to evaluate entropy fusion in the setting used by Bijelic and colleagues. Dataset access is pending registration, and the published split files need overlap checks before a reproduction experiment.
 
+### KITTI
+
+[KITTI](https://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d) provides camera images, LiDAR point clouds, calibration and labeled 3D objects. We are using its labeled train/validation split for a camera–LiDAR car-detection experiment while Seeing Through Fog access is pending. A small subset is verified, and the full labeled set is downloading; this experiment cannot test the paper's radar or gated-camera streams.
+
 ## Methods
 
 ### TransFusion
@@ -24,4 +28,4 @@ The [Waymo Open Dataset Perception dataset](https://waymo.com/open/) provides ca
 
 ### Entropy-steered multi-modal fusion
 
-Our [entropy-steered fusion method](methods/entropy_fusion/) is inspired by Mario Bijelic and colleagues’ CVPR 2020 paper, [Seeing Through Fog Without Seeing Fog](https://arxiv.org/abs/1902.08913). It combines camera images with LiDAR and radar projected onto the image plane, using local input entropy and sensor coverage to guide feature fusion at multiple resolutions. This three-modality adaptation uses a lightweight SSD-style head extended to predict 3D boxes, velocity, and attributes, with official nuScenes evaluation across all six camera views. The revised full run achieved 21.96% mAP and 28.60% NDS, compared with 15.91% and 24.17% for the first implementation. A four-modality Seeing Through Fog experiment is being prepared to check fidelity to the original method; entropy's contribution still needs a controlled comparison.
+Our [entropy-steered fusion method](methods/entropy_fusion/) is inspired by Mario Bijelic and colleagues’ CVPR 2020 paper, [Seeing Through Fog Without Seeing Fog](https://arxiv.org/abs/1902.08913). It combines projected sensor measurements through entropy-guided feature exchange and an SSD-style 3D detection head. The revised three-modality nuScenes run achieved 21.96% mAP and 28.60% NDS, compared with 15.91% and 24.17% for the first implementation. We are now testing camera–LiDAR car detection on KITTI and preparing the paper's four-modality Seeing Through Fog setting; neither adaptation establishes entropy's contribution without a controlled comparison.
