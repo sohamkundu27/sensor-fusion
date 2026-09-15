@@ -43,7 +43,7 @@ def prepare_targets(target, metadata, device):
         center = g2c[:3, :3] @ np.asarray(ann['translation']) + g2c[:3, 3]
         if not np.isfinite(center).all() or not 1 < center[2] <= 100:
             continue
-        if ann['num_lidar_pts'] + ann['num_radar_pts'] == 0:
+        if not ann.get('supervise_3d', ann.get('num_lidar_pts', 0) + ann.get('num_radar_pts', 0) > 0):
             continue
         uv = intrinsic @ center
         uv = uv[:2] / uv[2]

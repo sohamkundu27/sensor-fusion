@@ -48,6 +48,15 @@ def detection_loss(prediction, targets, metadata, camera_masks):
         target = prepare_targets(raw, meta, anchors.device)
         valid = camera_masks[i, 0, ac[:, 1].long().clamp(0, h-1), ac[:, 0].long().clamp(0, w-1)].bool()
         assignment, positive, negative = match_anchors(anchors, target['boxes'], valid)
+        ignored = raw.get('ignore_boxes')
+        if ignored is not None and len(ignored):
+            ignored = ignored.to(device=anchors.device, dtype=anchors.dtype)
+            lo = torch.maximum(anchors[:, None, :2], ignored[None, :, :2])
+            hi = torch.minimum(anchors[:, None, 2:], ignored[None, :, 2:])
+            intersection = (hi-lo).clamp_min(0).prod(-1)
+            area = (anchors[:, 2:]-anchors[:, :2]).clamp_min(1e-6).prod(-1)
+            # Do not teach background inside KITTI DontCare/Van regions.
+            negative &= (intersection/area[:, None]).amax(1) < .5
         count = int(positive.sum())
         total_positive += count
         labels = torch.zeros(len(anchors), dtype=torch.long, device=anchors.device)
@@ -60,7 +69,7 @@ def detection_loss(prediction, targets, metadata, camera_masks):
         chosen_negative = negative_indices[ce[negative].topk(num_negative).indices] if num_negative else negative_indices[:0]
         negative_ce = ce[chosen_negative]
         # Empty scenes still teach background without an unbounded loss scale.
-        normalizer = max(count, num_negative if count == 0 else 1)
+        normalizer = max(1, count, num_negative if count == 0 else 1)
         losses['logits'] = losses['logits'] + (ce[positive].sum()+negative_ce.sum())/normalizer
         if revised:
             # The same hard negatives supervise a zero localization-quality target.

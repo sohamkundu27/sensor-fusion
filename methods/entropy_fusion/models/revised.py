@@ -122,7 +122,7 @@ class ProgressiveFeatureExchange(nn.Module):
 
 
 class ReimplementedEntropyFusionDetector(nn.Module):
-    def __init__(self, pretrained=True, modality_dropout=.5, fusion_mode='entropy', dropout_mode='independent'):
+    def __init__(self, pretrained=True, modality_dropout=.5, fusion_mode='entropy', dropout_mode='independent', num_classes=10):
         super().__init__()
         from .revised_head import RevisedDetectionHead
         self.modality_dropout = modality_dropout
@@ -135,7 +135,7 @@ class ReimplementedEntropyFusionDetector(nn.Module):
         self.entropy = MeasurementEntropy()
         self.exchange = nn.ModuleList([ProgressiveFeatureExchange(channels, fusion_mode=fusion_mode)
                                        for channels in zip(self.camera.channels, self.lidar.channels, self.radar.channels)])
-        self.head = RevisedDetectionHead(in_channels=128)
+        self.head = RevisedDetectionHead(in_channels=128, num_classes=num_classes)
         self.register_buffer('mean', torch.tensor([.485, .456, .406]).view(1, 3, 1, 1))
         self.register_buffer('std', torch.tensor([.229, .224, .225]).view(1, 3, 1, 1))
 
