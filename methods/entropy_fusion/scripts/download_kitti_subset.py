@@ -62,12 +62,18 @@ class RemoteZipReader(io.RawIOBase):
 def fetch_archive(root, folder, extension, ids):
     url = BASE+f'data_object_{folder}.zip'
     reader = RemoteZipReader(url)
+    # Calibration/label ZIPs are small. Cache them once instead of repeatedly
+    # fetching 1 MiB ranges for hundreds of tiny, noncontiguous entries.
+    if reader.size <= 64*1024**2:
+        reader.read(reader.size)
+        reader.seek(0)
     records = []
     started = time.monotonic()
     with zipfile.ZipFile(reader) as archive:
-        for index, sample in enumerate(ids):
-            name = f'training/{folder}/{sample}.{extension}'
-            info = archive.getinfo(name)
+        wanted = [archive.getinfo(f'training/{folder}/{sample}.{extension}') for sample in ids]
+        # Read in archive order to reuse cached ranges for neighboring members.
+        for index, info in enumerate(sorted(wanted,key=lambda x:x.header_offset)):
+            name = info.filename
             path = root/name
             path.parent.mkdir(parents=True, exist_ok=True)
             if path.exists():

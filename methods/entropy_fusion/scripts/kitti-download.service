@@ -1,0 +1,9 @@
+[Unit]
+Description=Download and verify labeled KITTI camera and LiDAR data
+
+[Service]
+Type=simple
+WorkingDirectory=%h/sensor-fusion/methods/entropy_fusion
+ExecStart=%h/venvs/entropy-fusion/bin/python -u -m scripts.download_kitti_subset --root %h/data/kitti_full --train-count 3712 --val-count 3769
+KillMode=control-group
+TimeoutStopSec=30
