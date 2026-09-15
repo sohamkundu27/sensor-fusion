@@ -83,8 +83,11 @@ The paper instead uses half-width VGG branches, training from scratch, constant
 learning rate, and its own sensor/dataset setup. Our depth reference, 3D losses,
 quality scoring, top-down pyramid, optimizer/schedule and image augmentation are
 nuScenes-specific design choices. This revision is not evidence that entropy
-helps: `fusion_mode=concat` supplies a matching progressive-fusion control with
-entropy inputs/gates removed. A controlled comparison remains necessary.
+helps: `fusion_mode=concat` removes both entropy inputs and gates and changes layer
+shapes, so it is not a strict gating-only control. The newly prepared
+[matched gating pair](EXPERIMENT_AUDIT_20260915.md) preserves all layers and entropy
+concatenation and toggles only multiplicative gating. A measured comparison remains
+necessary.
 
 ## Verification
 

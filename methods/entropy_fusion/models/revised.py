@@ -91,10 +91,13 @@ class SensorBackbone(nn.Module):
 
 class ProgressiveFeatureExchange(nn.Module):
     """Joint entropy gates, entropy concatenation, and residual stream feedback."""
-    def __init__(self, channels, out_channels=128, fusion_mode='entropy', residual_scale=.1):
+    def __init__(self, channels, out_channels=128, fusion_mode='entropy', residual_scale=.1, entropy_gating=True):
         super().__init__()
         if fusion_mode not in ('entropy', 'concat'):
             raise ValueError('fusion_mode must be entropy or concat')
+        if not entropy_gating and fusion_mode != 'entropy':
+            raise ValueError('Disabling entropy gating requires fusion_mode=entropy')
+        self.entropy_gating = entropy_gating
         self.fusion_mode = fusion_mode
         self.residual_scale = residual_scale
         self.channels = tuple(channels)
@@ -112,7 +115,11 @@ class ProgressiveFeatureExchange(nn.Module):
             if self.gate is not None:
                 condition = torch.cat([F.interpolate(entropy, size=joint.shape[-2:], mode='bilinear', align_corners=False)
                                        * available[:, i, None, None, None] for i, entropy in enumerate(entropies)], dim=1)
-                joint = torch.cat((joint * self.gate(condition).sigmoid(), condition), dim=1)
+                # The gate-only ablation keeps the same layers and entropy inputs;
+                # only multiplicative feature weights change to identity. Dormant
+                # gate parameters receive no gradients in the off arm.
+                weight = self.gate(condition).sigmoid() if self.entropy_gating else torch.ones_like(joint)
+                joint = torch.cat((joint * weight, condition), dim=1)
             fused = self.project(joint)
             fused = fused.masked_fill(~available.any(1)[:, None, None, None], 0)
             updated = [(feature + self.residual_scale * feedback(fused)).masked_fill(
@@ -122,9 +129,10 @@ class ProgressiveFeatureExchange(nn.Module):
 
 
 class ReimplementedEntropyFusionDetector(nn.Module):
-    def __init__(self, pretrained=True, modality_dropout=.5, fusion_mode='entropy', dropout_mode='independent', num_classes=10):
+    def __init__(self, pretrained=True, modality_dropout=.5, fusion_mode='entropy', dropout_mode='independent', num_classes=10, entropy_gating=True):
         super().__init__()
         from .revised_head import RevisedDetectionHead
+        self.entropy_gating = entropy_gating
         self.modality_dropout = modality_dropout
         self.dropout_mode = dropout_mode
         if dropout_mode not in ('single','single_available','independent'):
@@ -133,7 +141,7 @@ class ReimplementedEntropyFusionDetector(nn.Module):
         self.camera = CameraBackbone(pretrained)
         self.lidar, self.radar = SensorBackbone(), SensorBackbone()
         self.entropy = MeasurementEntropy()
-        self.exchange = nn.ModuleList([ProgressiveFeatureExchange(channels, fusion_mode=fusion_mode)
+        self.exchange = nn.ModuleList([ProgressiveFeatureExchange(channels, fusion_mode=fusion_mode, entropy_gating=entropy_gating)
                                        for channels in zip(self.camera.channels, self.lidar.channels, self.radar.channels)])
         self.head = RevisedDetectionHead(in_channels=128, num_classes=num_classes)
         self.register_buffer('mean', torch.tensor([.485, .456, .406]).view(1, 3, 1, 1))

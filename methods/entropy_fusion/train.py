@@ -41,6 +41,8 @@ def parse_args():
     parser.add_argument('--dropout-mode', choices=['single','single_available','independent'], default='independent')
     parser.add_argument('--center-warmup-steps', type=int, default=0)
     parser.add_argument('--fusion-mode', choices=['entropy', 'concat'], default='entropy')
+    parser.add_argument('--entropy-gating', action=argparse.BooleanOptionalAction, default=True,
+                        help='Enable learned entropy feature gates; disabling retains entropy concatenation and all layers')
     parser.add_argument('--sensor-encoding', choices=['depth', 'dhi'], default='depth')
     parser.add_argument('--schedule-epochs', type=int, default=20)
     parser.add_argument('--warmup-steps', type=int, default=1000)
@@ -74,6 +76,8 @@ def parse_args():
         parser.error('Positive LR and dropout in [0, 1] required')
     if args.amp and not args.device.startswith('cuda'):
         parser.error('This runner supports AMP on CUDA only')
+    if not args.entropy_gating and (args.model_variant != 'paper_v2' or args.fusion_mode != 'entropy'):
+        parser.error('--no-entropy-gating requires paper_v2 with --fusion-mode entropy')
     if args.model_variant == 'baseline' and args.sensor_encoding != 'depth':
         parser.error('baseline requires --sensor-encoding depth')
     if args.model_variant == 'paper_v2' and args.sensor_encoding != 'dhi':
@@ -107,7 +111,7 @@ def main():
         for key, default in [('dataset','nuscenes'), ('num_classes',10)]:
             if checkpoint['config'].get(key, default) != config[key]:
                 raise ValueError(f'Resume setting differs: {key}')
-        for key, default in [('model_variant','baseline'), ('fusion_mode','entropy'), ('sensor_encoding','depth'), ('weight_decay',.01), ('schedule_epochs',20), ('warmup_steps',1000), ('dropout_mode','independent'), ('center_warmup_steps',0), ('worker_start_method','fork'), ('photometric_augmentation',False)]:
+        for key, default in [('model_variant','baseline'), ('entropy_gating',True), ('fusion_mode','entropy'), ('sensor_encoding','depth'), ('weight_decay',.01), ('schedule_epochs',20), ('warmup_steps',1000), ('dropout_mode','independent'), ('center_warmup_steps',0), ('worker_start_method','fork'), ('photometric_augmentation',False)]:
             if checkpoint['config'].get(key, default) != config[key]:
                 raise ValueError(f'Resume setting differs: {key}')
         for key in ('version', 'split', 'cameras', 'image_hw', 'batch_size', 'lr', 'amp', 'seed', 'accumulation_steps', 'modality_dropout'):
