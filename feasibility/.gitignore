@@ -11,3 +11,6 @@
 # Downloaded checkpoints
 *.pth
 *.pt
+
+# micromamba root prefix (package cache)
+mamba_root/
