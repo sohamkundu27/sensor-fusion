@@ -1,0 +1,16 @@
+{
+  "method": "bevfusion",
+  "config": "/home/soham/sensor-fusion/feasibility/bevfusion/repo/configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/bench_mini.yaml",
+  "ran": "N (OOM)",
+  "iters_requested": 30,
+  "batch_size": 1,
+  "dropped_pipeline_steps": [
+    "ObjectPaste"
+  ],
+  "dataset_len": 323,
+  "oom": true,
+  "blocker": "Out of VRAM at batch size 1: RuntimeError: /home/soham/sensor-fusion/feasibility/bevfusion/repo/mmdet3d/ops/spconv/src/indice_cuda.cu 124\ncuda execution failed with error 2",
+  "traceback": "/mmcv/runner/fp16_utils.py\", line 98, in new_func\n    return old_func(*args, **kwargs)\n  File \"/home/soham/sensor-fusion/feasibility/bevfusion/repo/mmdet3d/models/fusion_models/bevfusion.py\", line 319, in forward_single\n    feature = self.extract_features(points, sensor)\n  File \"/home/soham/sensor-fusion/feasibility/bevfusion/repo/mmdet3d/models/fusion_models/bevfusion.py\", line 154, in extract_features\n    x = self.encoders[sensor][\"backbone\"](feats, coords, batch_size, sizes=sizes)\n  File \"/home/soham/sensor-fusion/feasibility/bevfusion/env2/lib/python3.8/site-packages/torch/nn/modules/module.py\", line 1102, in _call_impl\n    return forward_call(*input, **kwargs)\n  File \"/home/soham/sensor-fusion/feasibility/bevfusion/env2/lib/python3.8/site-packages/mmcv/runner/fp16_utils.py\", line 98, in new_func\n    return old_func(*args, **kwargs)\n  File \"/home/soham/sensor-fusion/feasibility/bevfusion/repo/mmdet3d/models/backbones/sparse_encoder.py\", line 116, in forward\n    x = self.conv_input(input_sp_tensor)\n  File \"/home/soham/sensor-fusion/feasibility/bevfusion/env2/lib/python3.8/site-packages/torch/nn/modules/module.py\", line 1102, in _call_impl\n    return forward_call(*input, **kwargs)\n  File \"/home/soham/sensor-fusion/feasibility/bevfusion/repo/mmdet3d/ops/spconv/modules.py\", line 132, in forward\n    input = module(input)\n  File \"/home/soham/sensor-fusion/feasibility/bevfusion/env2/lib/python3.8/site-packages/torch/nn/modules/module.py\", line 1102, in _call_impl\n    return forward_call(*input, **kwargs)\n  File \"/home/soham/sensor-fusion/feasibility/bevfusion/repo/mmdet3d/ops/spconv/conv.py\", line 163, in forward\n    outids, indice_pairs, indice_pair_num = ops.get_indice_pairs(\n  File \"/home/soham/sensor-fusion/feasibility/bevfusion/repo/mmdet3d/ops/spconv/ops.py\", line 92, in get_indice_pairs\n    return get_indice_pairs_func(\nRuntimeError: /home/soham/sensor-fusion/feasibility/bevfusion/repo/mmdet3d/ops/spconv/src/indice_cuda.cu 124\ncuda execution failed with error 2\n",
+  "vram_gb_at_failure": 5.023,
+  "vram_reserved_gb_at_failure": 5.314
+}

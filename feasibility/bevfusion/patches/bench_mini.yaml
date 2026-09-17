@@ -1,0 +1,20 @@
+# Feasibility timing config: nuScenes-mini, batch 1.
+# Inherits from convfuser.yaml via torchpack recursive loading. Timing only.
+gt_paste_stop_epoch: -1
+
+model:
+  encoders:
+    camera:
+      vtransform:
+        # base.py now defaults add_depth_features=True (6-channel depth), but
+        # DepthLSSTransform.dtransform still hardcodes Conv2d(1, 8, 1).
+        # Force the scalar single-channel depth this config was written for.
+        add_depth_features: false
+        depth_input: scalar
+
+data:
+  samples_per_gpu: 1
+  workers_per_gpu: 2
+  train:
+    dataset:
+      ann_file: ${dataset_root + "nuscenes_mini_infos_train.pkl"}
