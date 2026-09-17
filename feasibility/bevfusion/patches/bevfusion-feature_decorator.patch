@@ -1,0 +1,30 @@
+diff --git a/mmdet3d/ops/feature_decorator/src/feature_decorator.cpp b/mmdet3d/ops/feature_decorator/src/feature_decorator.cpp
+index 0999bb1..a61fe4a 100644
+--- a/mmdet3d/ops/feature_decorator/src/feature_decorator.cpp
++++ b/mmdet3d/ops/feature_decorator/src/feature_decorator.cpp
+@@ -11,7 +11,7 @@ at::Tensor feature_decorator_forward(
+   const at::Tensor _y, 
+   const at::Tensor _z, 
+   const double vx, const double vy, const double x_offset, const double y_offset, 
+-  int normalize_coords, int use_cluster, int use_center
++  int64_t normalize_coords, int64_t use_cluster, int64_t use_center
+ ) {
+   int n = _x.size(0);
+   int c = _x.size(1);
+diff --git a/setup.py b/setup.py
+index 256e422..d3ac120 100644
+--- a/setup.py
++++ b/setup.py
+@@ -84,6 +84,12 @@ if __name__ == "__main__":
+                 ],
+                 extra_args=["-w", "-std=c++17"],
+             ),
++            make_cuda_ext(
++                name="feature_decorator_ext",
++                module="mmdet3d.ops.feature_decorator",
++                sources=["src/feature_decorator.cpp"],
++                sources_cuda=["src/feature_decorator_cuda.cu"],
++            ),
+             make_cuda_ext(
+                 name="bev_pool_ext",
+                 module="mmdet3d.ops.bev_pool",

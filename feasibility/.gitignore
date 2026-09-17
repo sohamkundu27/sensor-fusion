@@ -2,8 +2,10 @@
 # They are large (5+ GB), third-party, and reproducible from the commands
 # recorded in each method's RESULTS.md.
 */repo/
+!*/patches/
 */code/
 */env/
+*/env2/
 */venv/
 */mamba/
 *.log
