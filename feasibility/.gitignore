@@ -1,0 +1,13 @@
+# Vendored upstream clones and per-method environments are NOT tracked.
+# They are large (5+ GB), third-party, and reproducible from the commands
+# recorded in each method's RESULTS.md.
+*/repo/
+*/code/
+*/env/
+*/venv/
+*/mamba/
+*.log
+
+# Downloaded checkpoints
+*.pth
+*.pt
