@@ -1,17 +1,19 @@
-# Feasibility timing config: nuScenes-mini, batch 1.
-# Inherits from convfuser.yaml via torchpack recursive loading. Timing only.
-gt_paste_stop_epoch: -1
-
+# Feasibility timing config: convfuser.yaml + nuScenes-mini overrides, batch 1.
+# Sibling YAMLs are NOT inherited by torchpack (only parent default.yaml), so
+# convfuser.yaml's contents are merged in here explicitly. Timing only.
 model:
+  fuser:
+    type: ConvFuser
+    in_channels:
+    - 80
+    - 256
+    out_channels: 256
   encoders:
     camera:
       vtransform:
-        # base.py now defaults add_depth_features=True (6-channel depth), but
-        # DepthLSSTransform.dtransform still hardcodes Conv2d(1, 8, 1).
-        # Force the scalar single-channel depth this config was written for.
         add_depth_features: false
         depth_input: scalar
-
+gt_paste_stop_epoch: -1
 data:
   samples_per_gpu: 1
   workers_per_gpu: 2

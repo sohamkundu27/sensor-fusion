@@ -65,8 +65,9 @@ def main():
         opt = torch.optim.AdamW(model.parameters(), lr=1e-5)
 
         torch.cuda.reset_peak_memory_stats()
-        times = []
+        times = []; walls = []
         it = iter(loader)
+        tw = time.perf_counter()
         for i in range(args.warmup + args.iters):
             try:
                 data = next(it)
@@ -78,13 +79,21 @@ def main():
             opt.zero_grad(); loss.backward(); opt.step()
             torch.cuda.synchronize()
             dt = time.perf_counter() - t0
+            now = time.perf_counter()
             if i >= args.warmup:
-                times.append(dt)
-        times.sort()
-        med = times[len(times)//2]
+                times.append(dt); walls.append(now - tw)
+            tw = now
+        free_b, total_b = torch.cuda.mem_get_info()
+        res["device_used_gb"] = round((total_b - free_b)/1024**3, 3)   # all processes' view: torch + context + extension allocations
+        res["device_total_gb"] = round(total_b/1024**3, 3)
+        times.sort(); walls.sort()
+        med = walls[len(walls)//2]          # wall-clock incl. data loading
+        med_compute = times[len(times)//2]
         res.update(ran="Y",
                    sec_per_iter=round(med, 4),
-                   sec_per_iter_mean=round(sum(times)/len(times), 4),
+                   sec_per_iter_mean=round(sum(walls)/len(walls), 4),
+                   sec_per_iter_compute_only=round(med_compute, 4),
+                   data_wait_fraction=round(1 - med_compute/med, 3),
                    vram_gb=round(torch.cuda.max_memory_allocated()/1024**3, 3),
                    vram_reserved_gb=round(torch.cuda.max_memory_reserved()/1024**3, 3),
                    iters_timed=len(times),
@@ -100,7 +109,9 @@ def main():
                    oom=bool(oom),
                    blocker=("Out of VRAM at batch size 1: " + msg)[:400] if oom
                            else msg[:400],
-                   traceback=traceback.format_exc()[-2000:])
+                   traceback=traceback.format_exc()[-2000:],
+                   frames=[f"{fr.filename.split('/repo/')[-1]}:{fr.lineno} {fr.name}: {fr.line}"
+                           for fr in traceback.extract_tb(e.__traceback__)][-8:])
         try:
             import torch as _t
             res["vram_gb_at_failure"] = round(_t.cuda.max_memory_allocated()/1024**3, 3)

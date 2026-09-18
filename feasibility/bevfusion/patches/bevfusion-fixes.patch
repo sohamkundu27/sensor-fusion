@@ -59,6 +59,35 @@ index 0999bb1..a61fe4a 100644
  ) {
    int n = _x.size(0);
    int c = _x.size(1);
+diff --git a/mmdet3d/ops/spconv/src/indice_cuda.cu b/mmdet3d/ops/spconv/src/indice_cuda.cu
+index b67cca0..f7d00ba 100644
+--- a/mmdet3d/ops/spconv/src/indice_cuda.cu
++++ b/mmdet3d/ops/spconv/src/indice_cuda.cu
+@@ -45,13 +45,13 @@ struct CreateConvIndicePairFunctorP1<tv::GPU, Index, IndexGrid, NDim> {
+     if (numActIn == 0) return 0;
+     // auto timer = spconv::CudaContextTimer<>();
+     if (transpose)
+-      prepareDeConvIndicePairsKernel<Index, IndexGrid, NDim, 4096>
++      prepareDeConvIndicePairsKernel<Index, IndexGrid, NDim, 256>
+           <<<tv::launch::getBlocks(numActIn), tv::launch::CUDA_NUM_THREADS, 0,
+              d.getStream()>>>(indicesIn, indicesOut, gridsOut, indicePairs,
+                               indiceNum, indicePairUnique, kernelSize, stride,
+                               padding, dilation, outSpatialShape);
+     else
+-      prepareIndicePairsKernel<Index, IndexGrid, NDim, 4096>
++      prepareIndicePairsKernel<Index, IndexGrid, NDim, 256>
+           <<<tv::launch::getBlocks(numActIn), tv::launch::CUDA_NUM_THREADS, 0,
+              d.getStream()>>>(indicesIn, indicesOut, gridsOut, indicePairs,
+                               indiceNum, indicePairUnique, kernelSize, stride,
+@@ -116,7 +116,7 @@ struct CreateSubMIndicePairFunctor<tv::GPU, Index, IndexGrid, NDim> {
+         <<<tv::launch::getBlocks(numActIn), tv::launch::CUDA_NUM_THREADS, 0,
+            d.getStream()>>>(indicesIn, gridsOut, outSpatialShape);
+     TV_CHECK_CUDA_ERR();
+-    getSubMIndicePairsKernel<Index, IndexGrid, NDim, 4096>
++    getSubMIndicePairsKernel<Index, IndexGrid, NDim, 256>
+         <<<tv::launch::getBlocks(numActIn), tv::launch::CUDA_NUM_THREADS, 0,
+            d.getStream()>>>(indicesIn, gridsOut, indicePairs, indiceNum,
+                             kernelSize, stride, padding, dilation,
 diff --git a/setup.py b/setup.py
 index 256e422..d3ac120 100644
 --- a/setup.py
