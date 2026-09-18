@@ -1,0 +1,39 @@
+diff --git a/projects/SAMFusion/mmdet3d_plugin/models/detectors/deepinteraction.py b/projects/SAMFusion/mmdet3d_plugin/models/detectors/deepinteraction.py
+index 1f3cf7f..d96acb6 100755
+--- a/projects/SAMFusion/mmdet3d_plugin/models/detectors/deepinteraction.py
++++ b/projects/SAMFusion/mmdet3d_plugin/models/detectors/deepinteraction.py
+@@ -68,7 +68,6 @@ class DeepInteraction(MVXTwoStageDetector):
+             pts_backbone=pts_backbone,
+             img_neck=img_neck,
+             pts_neck=pts_neck,
+-            bbox_head=bbox_head,
+             pts_bbox_head=pts_bbox_head,
+             img_roi_head=img_roi_head,
+             img_rpn_head=img_rpn_head,
+@@ -76,6 +75,13 @@ class DeepInteraction(MVXTwoStageDetector):
+             test_cfg=test_cfg,
+             init_cfg=init_cfg,
+         )  # ,pretrained)
++        # No published mmdet3d (1.2.0 or current main) accepts bbox_head in
++        # MVXTwoStageDetector; SAMFusion was built against an unpublished fork.
++        # Build it here when given; when None, with_bbox stays False and the
++        # pts_bbox_head path is used, exactly as before.
++        if bbox_head is not None:
++            from mmdet3d.registry import MODELS as _MODELS
++            self.bbox_head = _MODELS.build(bbox_head)
+ 
+         if pts_voxel_layer:
+             self.voxelize_reduce = pts_voxel_layer.pop("voxelize_reduce")
+diff --git a/tools/dataset_converters/update_infos_to_v2.py b/tools/dataset_converters/update_infos_to_v2.py
+index b25cdce..d67ea5b 100755
+--- a/tools/dataset_converters/update_infos_to_v2.py
++++ b/tools/dataset_converters/update_infos_to_v2.py
+@@ -298,7 +298,7 @@ def update_nuscenes_infos(pkl_path, out_dir, pkl_name_new_name):
+     }
+     nusc = NuScenes(
+         version=data_list["metadata"]["version"],
+-        dataroot="/mnt/perception-aisee/Pubblic_Datasets/nuScenes/sets/nuscenes/",
++        dataroot=out_dir,  # was a hard-coded author path
+         verbose=True,
+     )
+ 

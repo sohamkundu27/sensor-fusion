@@ -1,0 +1,19 @@
+{
+  "method": "samfusion",
+  "config": "/home/soham/sensor-fusion/feasibility/samfusion/repo/projects/SAMFusion/configs/nuscenes/SAMFusion.py",
+  "ran": "Y",
+  "iters_requested": 30,
+  "batch_size": 1,
+  "dataset_len": 323,
+  "sec_per_iter": 0.711,
+  "sec_per_iter_mean": 0.7057,
+  "sec_per_iter_compute_only": 0.708,
+  "data_wait_fraction": 0.004,
+  "vram_gb": 7.364,
+  "vram_reserved_gb": 9.447,
+  "device_used_gb": 11.589,
+  "device_total_gb": 11.631,
+  "iters_timed": 30,
+  "hrs_epoch_mini": 0.064,
+  "hrs_epoch_full": 5.56
+}
