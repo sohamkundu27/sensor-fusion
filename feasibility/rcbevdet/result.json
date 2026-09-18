@@ -1,0 +1,19 @@
+{
+  "method": "rcbevdet",
+  "config": "/home/soham/sensor-fusion/feasibility/rcbevdet/code/rcbevdet-master/configs/rcbevdet/bench_mini.py",
+  "ran": "Y",
+  "iters_requested": 30,
+  "batch_size": 1,
+  "dataset_len": 323,
+  "device_used_gb": 3.88,
+  "device_total_gb": 11.631,
+  "sec_per_iter": 0.4942,
+  "sec_per_iter_mean": 0.4952,
+  "sec_per_iter_compute_only": 0.4825,
+  "data_wait_fraction": 0.024,
+  "vram_gb": 1.771,
+  "vram_reserved_gb": 2.059,
+  "iters_timed": 30,
+  "hrs_epoch_mini": 0.044,
+  "hrs_epoch_full": 3.86
+}

@@ -1,73 +1,74 @@
 # Feasibility: RCBEVDet
 
-Repo: https://github.com/VDIGPKU/RCBEVDet (cloned 2026-09-17)
-Paper: CVPR 2024, plus the RCBEVDet++ extension
+Repo: https://github.com/VDIGPKU/RCBEVDet (code from the in-repo `rcbevdet-master.zip`)
+Paper: CVPR 2024. Env: `feasibility/rcbevdet/env` (micromamba, Python 3.8, CUDA 11.3 in-env)
+Config timed: `configs/rcbevdet/rcbevdet-256x704-r50-BEV128-9kf-depth-cbgs12e-circlelarger.py`
+(ResNet-50, 256x704, 9 keyframes, radar, depth supervision) via `patches/bench_mini.py`.
 
-## Result
+## Result (measured 2026-09-18 on an idle RTX 3080)
 
 | Field | Value |
 |---|---|
-| Ran | **not yet — env not built** |
-| VRAM @ batch 1 | pending |
-| sec/iteration | pending |
-| Est. hrs/epoch (mini) | pending |
-| Est. hrs/epoch (full nuScenes) | pending |
-| Biggest blocker | none identified yet; **the expected access gate does not apply** |
+| Ran | **Y** |
+| VRAM @ batch 1 | **1.77 GB peak allocated** (2.06 GB reserved; 3.88 GB used device-wide) |
+| sec/iteration | **0.494 s** wall-clock median of 30 (compute-only 0.483 s; data wait 2.4%) |
+| Est. hrs/epoch (mini) | **0.044 h** (~2.7 min; 323 keyframes) |
+| Est. hrs/epoch (full nuScenes) | **3.86 h** (28,130 keyframes) |
+| Biggest blocker | None at runtime. Packaging gaps in the released zip (below). |
 
-## The code is NOT gated any more
+**The access gate is gone.** The README's academic-use application is struck through
+and the code ships in-repo as a zip. No manual request was needed.
 
-This method was queued to be skipped pending an academic-use request. That is out
-of date. In the current README the gating sentence is struck through:
+### Why memory is so low — checked, not assumed
 
-> ~~**Note: please sign the [application](...) to obtain the code** **of RCBEVDet.**~~
+1.77 GB is small for 6 cameras x 9 frames, so the inputs were verified: each sample
+carries a **54 x 3 x 256 x 704 image tensor (6 cams x 9 frames)** and radar points
+(1,928 x 7 on sample 0). The detector (`BEVDepth4D_RC`, `with_prev=True` by default)
+runs all 9 frames through the backbone and view transform, but only the key frame
+with gradients; the 8 adjacent frames run under `torch.no_grad()`
+(`bevdet_rc.py:755-769`). So activations are stored for 1 frame of 9 — that, not a
+missing input, is why it is light. It is also the only method here that uses spconv
+2.x (pip `spconv-cu113` 2.3.6), so it does not carry the 6.5 GB kernel reservation
+BEVFusion and TransFusion hit.
 
-and the update log records:
+Timing caveat: CBGS unwrapped (one epoch = 323 / 28,130 keyframes). The published
+schedule is 12 epochs with CBGS, i.e. several times more iterations per epoch.
 
-> * 2024/06/01 - Code for RCBEVDet is released in the zip file.
+## Everything changed to get it running
 
-The code ships in-repo as `rcbevdet-master.zip` (1.18 MB), unpacked here to
-`feasibility/rcbevdet/code/rcbevdet-master/`. It contains `configs/`, `mmdet3d/`,
-`tools/` and `setup.py` — a complete mmdet3d-derived tree. Model weights are on
-Google Drive, linked openly in the README.
+No source edits to RCBEVDet itself. Gaps in the released zip, worked around:
 
-**No manual step is needed from you.** The `RCBEVDet Application.docx` is still in
-the repo but is vestigial.
+1. **`requirements/` is missing from the zip**, but `setup.py` reads
+   `requirements/runtime.txt` (and the README tells you to edit a `requirements.txt`
+   that is also absent). Recreated with mmdet3d v1.0.0rc4's runtime set — see
+   `patches/requirements_runtime.txt`: `lyft_dataset_sdk`, `networkx<2.3`,
+   `numba==0.53.0`, `numpy<1.24`, `nuscenes-devkit`, `plyfile`, `scikit-image`,
+   `tensorboard`, `trimesh==2.35.39`.
+2. **`NuScenesDataset_R` does not exist.** It is listed in `mmdet3d.datasets.__all__`
+   and imported by `tools/data_converter/nuscenes_converter_RC.py`, but never
+   defined — a file is missing from the zip. The converter only needs its
+   `NameMapping`, so `prep_mini.py` aliases the class that does exist
+   (`NuScenesDatasetRC`, identical mapping) instead of editing upstream code.
+3. **Leftover debug import**: `datasets/samplers/group_sampler.py` does
+   `from IPython import embed`. Installed `ipython<8.13` rather than editing.
+4. **`tools/create_data_nuscenes_RC.py` hard-codes `v1.0-trainval` and also
+   processes `v1.0-test`.** `prep_mini.py` calls its functions for `v1.0-mini`
+   (the adjacency-info step copied verbatim with only the version string changed).
 
-The fusion config present is:
-`configs/rcbevdet/rcbevdet-256x704-r50-BEV128-9kf-depth-cbgs12e-circlelarger.py`
-— ResNet-50, 256x704 input, BEV 128, 9 keyframes, depth supervision, CBGS, 12
-epochs. Note 9 keyframes and CBGS: like BEVFusion, this recipe leans on temporal
-accumulation and class-balanced resampling.
+## Install issues encountered
 
-## Requirements (from the bundled README)
-
-Two supported combinations are given:
-
-| | Option A (A800/A40, CUDA 12.1) | Option B (other GPUs, CUDA 11.6) |
-|---|---|---|
-| Python | 3.8.13 | 3.8.13 |
-| CUDA | 12.1 | 11.6 |
-| PyTorch | 2.0.1+cu118 | 1.12.1+cu116 |
-| torchvision | 0.15.2+cu118 | 0.13.0+cu116 |
-| mmcv-full | 1.6.0 | 1.6.2 |
-| mmdet | 2.28.2 | 2.24.0 |
-
-Option B is the intended path for a consumer card like the 3080. Both need the
-repo's own CUDA ops compiled (`mmdet3d/ops/csrc`) and a `spconv` version matched
-to the CUDA build.
-
-## Status and expected obstacles
-
-The environment has not been built yet — BEVFusion and TransFusion were taken
-first, and the shared CUDA-toolkit problem (below) had to be solved once before
-replicating it.
-
-The known machine-level constraint applies here too: **no CUDA toolkit is
-installed** (driver 580.173.02 / CUDA 13.0, no `nvcc` under `/usr/local`), so a
-matched toolkit must go into the env before `mmdet3d/ops/csrc` will compile. See
-`feasibility/bevfusion/RESULTS.md` for the version-pinning trap encountered there.
+1. **README's pin set is internally inconsistent.** Option B pairs `mmcv-full 1.6.2`
+   with `mmdet 2.24.0`, but mmdet 2.24.0 asserts `mmcv<=1.6.0` and refuses to import.
+   Built with `mmcv-full 1.6.0`.
+2. **gcc too new for torch 1.12's check.** torch 1.12's cpp_extension enforces gcc
+   <= 10.0 for CUDA 11.3 (torch 1.10 does not). The env's gcc 10.4 failed every op
+   build; `gxx_linux-64=9` (9.5.0) fixed it. Misleading symptom: the post-build
+   `import mmdet3d` still printed OK because the import works without the ops.
+3. Same CUDA-toolkit / `sysroot_linux-64=2.17` recipe as the other methods.
+4. Verified: `torch 1.12.1+cu113, mmcv 1.6.0, mmdet 2.24.0, spconv 2.3.6, cuda True`;
+   `mmdet3d/ops/csrc` and `deformattn` (MultiScaleDeformableAttention) built.
 
 ## Data
 
-nuScenes is present locally in full, so no download is needed. As with the other
-mmdet3d methods, `.pkl` infos must be generated for the mini split first.
+`nuscenes_RC_mini_infos_{train,val}.pkl` (323 / 81) in `/home/soham/data/nuscenes/`,
+generated by RCBEVDet's own converter via `prep_mini.py`.

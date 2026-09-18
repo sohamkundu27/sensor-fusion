@@ -1,0 +1,11 @@
+# Recreated: requirements/ is absent from the released rcbevdet-master.zip, but
+# setup.py reads this file. Contents = mmdet3d v1.0.0rc4 runtime requirements.
+lyft_dataset_sdk
+networkx>=2.2,<2.3
+numba==0.53.0
+numpy<1.24
+nuscenes-devkit
+plyfile
+scikit-image
+tensorboard
+trimesh>=2.35.39,<2.35.40
