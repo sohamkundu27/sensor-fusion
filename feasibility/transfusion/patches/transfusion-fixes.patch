@@ -1,0 +1,42 @@
+diff --git a/mmdet3d/ops/spconv/src/indice_cuda.cu b/mmdet3d/ops/spconv/src/indice_cuda.cu
+index b67cca0..f7d00ba 100644
+--- a/mmdet3d/ops/spconv/src/indice_cuda.cu
++++ b/mmdet3d/ops/spconv/src/indice_cuda.cu
+@@ -45,13 +45,13 @@ struct CreateConvIndicePairFunctorP1<tv::GPU, Index, IndexGrid, NDim> {
+     if (numActIn == 0) return 0;
+     // auto timer = spconv::CudaContextTimer<>();
+     if (transpose)
+-      prepareDeConvIndicePairsKernel<Index, IndexGrid, NDim, 4096>
++      prepareDeConvIndicePairsKernel<Index, IndexGrid, NDim, 256>
+           <<<tv::launch::getBlocks(numActIn), tv::launch::CUDA_NUM_THREADS, 0,
+              d.getStream()>>>(indicesIn, indicesOut, gridsOut, indicePairs,
+                               indiceNum, indicePairUnique, kernelSize, stride,
+                               padding, dilation, outSpatialShape);
+     else
+-      prepareIndicePairsKernel<Index, IndexGrid, NDim, 4096>
++      prepareIndicePairsKernel<Index, IndexGrid, NDim, 256>
+           <<<tv::launch::getBlocks(numActIn), tv::launch::CUDA_NUM_THREADS, 0,
+              d.getStream()>>>(indicesIn, indicesOut, gridsOut, indicePairs,
+                               indiceNum, indicePairUnique, kernelSize, stride,
+@@ -116,7 +116,7 @@ struct CreateSubMIndicePairFunctor<tv::GPU, Index, IndexGrid, NDim> {
+         <<<tv::launch::getBlocks(numActIn), tv::launch::CUDA_NUM_THREADS, 0,
+            d.getStream()>>>(indicesIn, gridsOut, outSpatialShape);
+     TV_CHECK_CUDA_ERR();
+-    getSubMIndicePairsKernel<Index, IndexGrid, NDim, 4096>
++    getSubMIndicePairsKernel<Index, IndexGrid, NDim, 256>
+         <<<tv::launch::getBlocks(numActIn), tv::launch::CUDA_NUM_THREADS, 0,
+            d.getStream()>>>(indicesIn, gridsOut, indicePairs, indiceNum,
+                             kernelSize, stride, padding, dilation,
+diff --git a/mmdet3d/ops/voxel/src/scatter_points_cuda.cu b/mmdet3d/ops/voxel/src/scatter_points_cuda.cu
+index 8d888b0..a70aa49 100644
+--- a/mmdet3d/ops/voxel/src/scatter_points_cuda.cu
++++ b/mmdet3d/ops/voxel/src/scatter_points_cuda.cu
+@@ -269,7 +269,7 @@ std::vector<at::Tensor> dynamic_point_to_voxel_forward_gpu(
+   AT_CUDA_CHECK(cudaGetLastError());
+ 
+   coors_map_sorted = coors_map_sorted.cumsum(0, torch::kInt32);
+-  coors_map.index_put_(coors_id_argsort, coors_map_sorted);
++  coors_map.index_put_({coors_id_argsort}, coors_map_sorted);
+ 
+   const int num_coors_cpu =
+       coors_map_sorted[-1].cpu().data_ptr<int32_t>()[0] + 1;

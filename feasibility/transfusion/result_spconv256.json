@@ -1,0 +1,22 @@
+{
+  "method": "transfusion-L",
+  "config": "/home/soham/sensor-fusion/feasibility/transfusion/repo/configs/bench_mini_voxel_L.py",
+  "ran": "Y",
+  "iters_requested": 30,
+  "batch_size": 1,
+  "dropped_pipeline_steps": [
+    "ObjectSample"
+  ],
+  "dataset_len": 323,
+  "device_used_gb": 5.386,
+  "device_total_gb": 11.631,
+  "sec_per_iter": 0.3419,
+  "sec_per_iter_mean": 0.3416,
+  "sec_per_iter_compute_only": 0.3405,
+  "data_wait_fraction": 0.004,
+  "vram_gb": 2.561,
+  "vram_reserved_gb": 2.992,
+  "iters_timed": 30,
+  "hrs_epoch_mini": 0.031,
+  "hrs_epoch_full": 2.67
+}
