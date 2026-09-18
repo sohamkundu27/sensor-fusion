@@ -30,9 +30,15 @@ def main():
     try:
         from mmcv import Config
         from mmdet3d.datasets import build_dataset
-        from mmdet3d.models import build_model
         from mmcv.parallel import MMDataParallel
-        from mmdet3d.datasets import build_dataloader
+        try:                                   # mmdet3d >= 0.13
+            from mmdet3d.models import build_model
+        except ImportError:                    # mmdet3d 0.11 (TransFusion)
+            from mmdet3d.models import build_detector as build_model
+        try:
+            from mmdet3d.datasets import build_dataloader
+        except ImportError:
+            from mmdet.datasets import build_dataloader
 
         if args.loader == "torchpack":
             from torchpack.utils.config import configs as tp_configs
