@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Minimal transient LiDAR-in-fog smoke-test scene for mitransient 1.3.0 / Mitsuba 3.8.0.
+  Load with a *_mono variant (cuda_ad_mono or llvm_ad_mono) after `import mitransient`.
+
+  PLACEHOLDERS: every LiDAR/fog/material number in this file (905 nm, 1 ns pulse,
+  60 deg FOV, 64x64, 512 bins, 100 ps bins, sensor height, reflectances, sigma_t,
+  albedo, g, emitter radiance) is a stand-in for a cheap first test, not a real
+  sensor or fog specification.
+
+  Coordinates: metres, y up, sensor at (0, 1, 0) looking along +z.
+  Time is optical path length (OPL) in metres; all emitters fire at t = 0 (delta
+  pulse). The ~1 ns pulse shape is applied afterwards by convolution (see
+  analyze.py), because mitransient 1.3.0 has no temporal pulse/filter option.
+
+  Tunable parameters (override with mi.load_file(path, sigma_t=..., ...)):
+-->
+<scene version="3.0.0">
+    <!-- Fog: homogeneous medium, Henyey-Greenstein phase. sigma_t in 1/m. -->
+    <default name="sigma_t"   value="0.0"/>
+    <default name="albedo"    value="0.95"/>
+    <default name="g"         value="0.85"/>
+    <!-- Render controls -->
+    <default name="spp"       value="4096"/>
+    <default name="max_depth" value="8"/>
+    <default name="rr_depth"  value="5"/>
+    <!-- Transient film: 512 bins x 100 ps. bin_width_opl = c * 100 ps.
+         Window = 51.2 ns = 15.35 m OPL = ~7.67 m one-way (round trip). -->
+    <default name="bins"          value="512"/>
+    <default name="bin_width_opl" value="0.0299792458"/>
+    <default name="start_opl"     value="0.0"/>
+    <!-- "905 nm equivalent" is a label only: mono variants carry no wavelength.
+         Reflectances below stand in for NIR (905 nm) values. -->
+    <default name="rho_ground" value="0.2"/>
+    <default name="rho_object" value="0.5"/>
+
+    <integrator type="transient_prbvolpath">
+        <integer name="max_depth" value="$max_depth"/>
+        <integer name="rr_depth"  value="$rr_depth"/>
+    </integrator>
+
+    <!-- Sensor: 60 deg FOV (both axes, square film). near_clip is tiny because
+         camera rays start at the near plane and OPL is counted from there. -->
+    <sensor type="perspective" id="lidar">
+        <float name="fov" value="60"/>
+        <string name="fov_axis" value="x"/>
+        <float name="near_clip" value="0.0001"/>
+        <float name="far_clip" value="100"/>
+        <transform name="to_world">
+            <lookat origin="0, 1, 0" target="0, 1, 1" up="0, 1, 0"/>
+        </transform>
+        <sampler type="independent">
+            <integer name="sample_count" value="$spp"/>
+        </sampler>
+        <film type="transient_hdr_film">
+            <integer name="width"  value="64"/>
+            <integer name="height" value="64"/>
+            <integer name="temporal_bins" value="$bins"/>
+            <float name="bin_width_opl" value="$bin_width_opl"/>
+            <float name="start_opl" value="$start_opl"/>
+            <rfilter type="box"/>
+        </film>
+    </sensor>
+
+    <!-- Laser stand-in: 1 cm radius disk 1 mm behind the sensor, facing +z.
+         angulararea cutoff_angle is the cone HALF-angle, so 30 deg = 60 deg full
+         cone, matching the sensor FOV. Flat-top beam (beam_width = cutoff_angle).
+         Image corners are ~39 deg off-axis and fall outside the cone (unlit). -->
+    <shape type="disk" id="laser">
+        <transform name="to_world">
+            <scale value="0.01"/>
+            <translate value="0, 1, -0.001"/>
+        </transform>
+        <emitter type="angulararea">
+            <float name="cutoff_angle" value="30"/>
+            <float name="beam_width" value="30"/>
+            <spectrum name="radiance" value="10000"/>
+        </emitter>
+    </shape>
+
+    <medium type="homogeneous" id="fog">
+        <float name="sigma_t" value="$sigma_t"/>
+        <float name="albedo"  value="$albedo"/>
+        <float name="scale"   value="1"/>
+        <phase type="hg">
+            <float name="g" value="$g"/>
+        </phase>
+    </medium>
+
+    <!-- Fog container. mitransient 1.3.0 ignores a medium attached to the sensor
+         ("TODO: support sensors inside media"), so camera rays start in vacuum
+         and must enter the fog through this null-BSDF box. Its front face is
+         5 cm in front of the sensor; it spans x in [-10, 10], y in [-1, 8],
+         z in [0.05, 12.05], which encloses the whole 7.67 m window. -->
+    <shape type="cube" id="fog_box">
+        <transform name="to_world">
+            <scale value="10, 4.5, 6"/>
+            <translate value="0, 3.5, 6.05"/>
+        </transform>
+        <bsdf type="null"/>
+        <ref name="interior" id="fog"/>
+    </shape>
+
+    <!-- One BSDF instance per shape: Mitsuba merges same-BSDF meshes and
+         drops their ids (both boxes became one unnamed mesh otherwise). -->
+    <bsdf type="diffuse" id="mat_ground">
+        <float name="reflectance" value="$rho_ground"/>
+    </bsdf>
+    <bsdf type="diffuse" id="mat_A">
+        <float name="reflectance" value="$rho_object"/>
+    </bsdf>
+    <bsdf type="diffuse" id="mat_B">
+        <float name="reflectance" value="$rho_object"/>
+    </bsdf>
+    <bsdf type="diffuse" id="mat_C">
+        <float name="reflectance" value="$rho_object"/>
+    </bsdf>
+
+    <!-- Ground plane y = 0, z in [0.05, 12.05], x in [-10, 10]. -->
+    <shape type="rectangle" id="ground">
+        <transform name="to_world">
+            <scale value="10, 6, 1"/>
+            <rotate x="1" angle="-90"/>
+            <translate value="0, 0, 6.05"/>
+        </transform>
+        <ref id="mat_ground"/>
+    </shape>
+
+    <!-- Object A: sphere r = 0.5 on the ground, left. Nearest point ~3.58 m. -->
+    <shape type="sphere" id="obj_A_sphere">
+        <point name="center" x="-1.4" y="0.5" z="3.8"/>
+        <float name="radius" value="0.5"/>
+        <ref id="mat_A"/>
+    </shape>
+
+    <!-- Object B: 1 m cube on the ground, right. Front face z = 5.0, ~5.10-5.48 m. -->
+    <shape type="cube" id="obj_B_box">
+        <transform name="to_world">
+            <scale value="0.5, 0.5, 0.5"/>
+            <translate value="1.5, 0.5, 5.5"/>
+        </transform>
+        <ref id="mat_B"/>
+    </shape>
+
+    <!-- Object C: 1.6 x 1.5 x 1.0 m box on the ground, centre. Front face z = 6.5, ~6.50-6.62 m. -->
+    <shape type="cube" id="obj_C_box">
+        <transform name="to_world">
+            <scale value="0.8, 0.75, 0.5"/>
+            <translate value="0, 0.75, 7.0"/>
+        </transform>
+        <ref id="mat_C"/>
+    </shape>
+</scene>
