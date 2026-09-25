@@ -436,3 +436,123 @@ which is expected on already-patched source.
    not show the Editor is up.
 
 NumPy was not pinned or changed on any machine.
+
+## CARLA machine attempt — 2026-09-25: requested branch unavailable
+
+From `/home/soham/sensor-fusion` on `main`, ran:
+
+```sh
+git fetch origin claude/focused-cerf-yvnfcx
+```
+
+The command exited **128** with:
+
+```text
+fatal: couldn't find remote ref claude/focused-cerf-yvnfcx
+```
+
+`origin` is `git@github.com:sohamkundu27/sensor-fusion.git`. The requested
+branch could not be fetched, so work stopped as instructed, even though
+the local document contains the Boost.NumPy patch and insertion command.
+No patch was saved or applied, and `Setup.sh` was not changed.
+`make setup`, `make launch`, and display `:99` capture were not attempted.
+Setup success, advancement to rpclib, and the Unreal Editor display remain
+unverified on this machine.
+
+## CARLA machine run — 2026-09-25 05:34 UTC: Boost passes, rpclib fails
+
+After confirmation that the branch was merged, `git pull --ff-only origin main`
+reported up to date at `8c69774cd384351780dd7a3e1ef897e8ab2c6677`.
+Copied the patch byte-for-byte from the **Boost.NumPy decision** section to
+`~/carla/patches/boost_numpy2_dtype.patch`, preserving its trailing space.
+Ran that section's exact `sed` command: `Setup.sh:173` now applies the patch
+immediately after the Boost-source `pushd`. Verified the single-line insertion
+and `bash -n`; the existing gold-linker changes remain in place.
+
+Ran `make setup` from `~/carla/carla-0.9.16-src`, with
+`UE4_ROOT=/home/soham/UnrealEngine_4.26` and `DISPLAY=:99`.
+
+| Check | Result |
+|---|---|
+| Start / end (UTC) | 05:33:45 / 05:34:19 |
+| Duration / make exit | **34.18 s / 2**; setup recipe reports Error 1 |
+| Patch during fresh extraction | `patching file libs/python/src/numpy/dtype.cpp` |
+| Boost stage / install summaries | `...updated 278 targets...` / `...updated 17044 targets...` |
+| `failed updating` in complete log | **0 occurrences** |
+| NumPy libraries installed | `libboost_numpy312.a`, `.so`, and `.so.1.84.0` |
+| Advanced into rpclib | **Yes**: retrieved rpclib, then `Building rpclib with libc++.` |
+
+The new stopping point is the CMake invocation at `Setup.sh:260`, in
+`Build/rpclib-v2.2.1_c5-c10-libcxx-build`. CMake's C compiler link test fails
+at `/usr/share/cmake-3.28/Modules/CMakeTestCCompiler.cmake:67`, called from
+rpclib's `CMakeLists.txt:2 (project)`.
+
+The test invokes UE's clang 10 without `-fuse-ld=gold` and reaches its bundled
+`x86_64-unknown-linux-gnu-ld`. Exact diagnostic lines below, with only the
+linker executable's directory prefix omitted:
+
+```text
+x86_64-unknown-linux-gnu-ld: /lib/x86_64-linux-gnu/libc.so.6: unknown type [0x13] section `.relr.dyn'
+x86_64-unknown-linux-gnu-ld: cannot find /lib/x86_64-linux-gnu/libc.so.6
+x86_64-unknown-linux-gnu-ld: /lib64/ld-linux-x86-64.so.2: unknown type [0x13] section `.relr.dyn'
+x86_64-unknown-linux-gnu-ld: cannot find /lib64/ld-linux-x86-64.so.2
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+make: *** [Util/BuildTools/Linux.mk:142: setup] Error 1
+```
+
+Full log: `~/carla/logs/make_setup_numpy2_20260925T053328Z.log`
+(CMake error begins at line 19212); timing and exit status are in adjacent
+`.time` and `.status` files. CMake details are in
+`Build/rpclib-v2.2.1_c5-c10-libcxx-build/CMakeFiles/CMakeConfigureLog.yaml`.
+
+**Stopped as requested after setup failed.** No further fixes were attempted.
+`make launch` was not run, and display `:99` was not captured or inspected
+during this run. The NumPy build blocker is resolved on this machine;
+setup and the Unreal Editor remain blocked at rpclib's compiler link test.
+
+## Repair completed — 2026-09-25: setup passes, Unreal Editor running
+
+**The installed CARLA 0.9.16 editor now builds and runs on this machine.**
+The failures came from older build scripts meeting Ubuntu 24.04: incompatible
+linkers/headers, an archive URL that moved, and missing compiler settings.
+
+Persistent repairs:
+
+- Preserved the exact validated Boost.NumPy patch and its `Setup.sh` hook.
+- Shared gold-linker flags across dependency builds; retained the compiler
+  flag through libpng/SQLite's older libtool.
+- Corrected the official libpng 1.6.37 archive URL without changing versions.
+- Added PROJ's missing `<cstdint>` include and position-independent C objects.
+- Built editor-facing Xerces, PROJ, and OSM2ODR with Unreal's sysroot and
+  `-pthread`, eliminating incompatible `__isoc23_*` references.
+- Made SQLite/Xerces/PROJ retries detect incomplete installations.
+
+| Verification | Result |
+|---|---|
+| Final standalone `make setup` | **Exit 0**, 129.67 s, `Setup.sh: Success!` |
+| Boost / rpclib | Boost built and installed with **zero `failed updating` lines**; rpclib and all later setup dependencies completed |
+| `make launch` | LibCarla, OSM2ODR, plugins, and Unreal project linked; **UE4Editor running**, PID 826141 |
+| Loaded map | **Town10HD_Opt**, 4,013 actors; map check **0 errors, 0 warnings** |
+| Display / interaction | Vulkan on RTX 3080; mouse and keyboard interaction verified on `:99` |
+
+Captured `:99` with `xwd -root`, converted with the locally extracted
+ImageMagick `convert`, and **actually viewed the PNG** at 14:53:58 UTC.
+[Screenshot](carla-recon/display99-editor-working-20260925.png) shows the full
+Unreal Editor interface: menus, toolbar, Content Browser, World Outliner,
+and a rendered city with streets, palm trees, and high-rise buildings.
+The viewport is in Game View, hiding editor guides. The editor remains open;
+`make launch` is therefore still running, not reported as having exited 0.
+
+The first startup built asset/shader caches and took 1,449.71 seconds.
+Nonfatal startup messages remain, including a handled Vulkan assertion while
+enumerating llvmpipe, cache-write messages, and optional MDL asset warnings.
+These did not prevent the loaded, interactive editor; the log is not warning-free.
+
+Reproducible patches and commands are in
+[`sim/carla_setup/`](../sim/carla_setup/README.md). The combined patch applies
+cleanly to the original scripts and reproduces the live changes; shell syntax
+checks pass. The bundled NumPy patch remains byte-for-byte identical.
+
+Logs: `~/carla/logs/make_setup_server_threads_20260925.log` and
+`~/carla/logs/make_launch_server_sysroot_20260925.log`.
+Raw capture: `~/carla/logs/display99-editor-working-20260925.xwd`.

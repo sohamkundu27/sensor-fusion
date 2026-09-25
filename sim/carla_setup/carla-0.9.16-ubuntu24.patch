@@ -1,0 +1,210 @@
+diff --git a/Util/BuildTools/BuildOSM2ODR.sh b/Util/BuildTools/BuildOSM2ODR.sh
+index 782991e..a81e49f 100755
+--- a/Util/BuildTools/BuildOSM2ODR.sh
++++ b/Util/BuildTools/BuildOSM2ODR.sh
+@@ -120,7 +120,8 @@ if ${BUILD_OSM2ODR} ; then
+ 
+   cmake ${OSM2ODR_SOURCE_FOLDER} \
+       -G "Eclipse CDT4 - Ninja" \
+-      -DCMAKE_CXX_FLAGS="-fPIC -std=c++14 -stdlib=libc++ -I${LLVM_INCLUDE} -L${LLVM_LIBPATH}" \
++      -DCMAKE_SYSROOT="$UE4_ROOT/Engine/Extras/ThirdPartyNotUE/SDKs/HostLinux/Linux_x64/v17_clang-10.0.1-centos7/x86_64-unknown-linux-gnu/" \
++      -DCMAKE_CXX_FLAGS="-fPIC -std=c++14 -stdlib=libc++ -pthread -I${LLVM_INCLUDE} -L${LLVM_LIBPATH}" \
+       -DCMAKE_INSTALL_PREFIX=${LIBCARLA_INSTALL_SERVER_FOLDER} \
+       -DPROJ_INCLUDE_DIR=${CARLA_BUILD_FOLDER}/proj-install-server/include \
+       -DPROJ_LIBRARY=${CARLA_BUILD_FOLDER}/proj-install-server/lib/libproj.a \
+@@ -139,7 +140,8 @@ if ${BUILD_OSM2ODR} ; then
+ 
+   cmake ${OSM2ODR_SOURCE_FOLDER} \
+       -G "Eclipse CDT4 - Ninja" \
+-      -DCMAKE_CXX_FLAGS="-fPIC -std=c++14 -stdlib=libc++ -I${LLVM_INCLUDE} -L${LLVM_LIBPATH}" \
++      -DCMAKE_SYSROOT="$UE4_ROOT/Engine/Extras/ThirdPartyNotUE/SDKs/HostLinux/Linux_x64/v17_clang-10.0.1-centos7/x86_64-unknown-linux-gnu/" \
++      -DCMAKE_CXX_FLAGS="-fPIC -std=c++14 -stdlib=libc++ -pthread -I${LLVM_INCLUDE} -L${LLVM_LIBPATH}" \
+       -DCMAKE_INSTALL_PREFIX=${LIBCARLA_INSTALL_SERVER_FOLDER} \
+       -DPROJ_INCLUDE_DIR=${CARLA_BUILD_FOLDER}/proj-install-server/include \
+       -DPROJ_LIBRARY=${CARLA_BUILD_FOLDER}/proj-install-server/lib/libproj.a \
+diff --git a/Util/BuildTools/Environment.sh b/Util/BuildTools/Environment.sh
+index fa9cf05..8fcf600 100644
+--- a/Util/BuildTools/Environment.sh
++++ b/Util/BuildTools/Environment.sh
+@@ -8,6 +8,11 @@ CURDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../.." && pwd )"
+ source $(dirname "$0")/Vars.mk
+ unset CURDIR
+ 
++# The UE clang 10 bundled linker cannot read Ubuntu 24.04 glibc's RELR
++# sections. CMake and Autoconf honor LDFLAGS for C and C++ link tests and
++# dependency builds; keep this shared by setup, LibCarla, and OSM2ODR.
++export LDFLAGS="${LDFLAGS:+${LDFLAGS} }-fuse-ld=gold"
++
+ if [ -n "${CARLA_BUILD_NO_COLOR}" ]; then
+ 
+   function log {
+diff --git a/Util/BuildTools/Setup.sh b/Util/BuildTools/Setup.sh
+index 9f93676..bd32ebd 100755
+--- a/Util/BuildTools/Setup.sh
++++ b/Util/BuildTools/Setup.sh
+@@ -66,7 +66,8 @@ pushd ${CARLA_BUILD_FOLDER} >/dev/null
+ 
+ LLVM_INCLUDE="$UE4_ROOT/Engine/Source/ThirdParty/Linux/LibCxx/include/c++/v1"
+ LLVM_LIBPATH="$UE4_ROOT/Engine/Source/ThirdParty/Linux/LibCxx/lib/Linux/x86_64-unknown-linux-gnu"
+-UNREAL_HOSTED_CFLAGS="--sysroot=$UE4_ROOT/Engine/Extras/ThirdPartyNotUE/SDKs/HostLinux/Linux_x64/v17_clang-10.0.1-centos7/x86_64-unknown-linux-gnu/"
++UNREAL_SYSROOT="$UE4_ROOT/Engine/Extras/ThirdPartyNotUE/SDKs/HostLinux/Linux_x64/v17_clang-10.0.1-centos7/x86_64-unknown-linux-gnu/"
++UNREAL_HOSTED_CFLAGS="--sysroot=${UNREAL_SYSROOT}"
+ 
+ # ==============================================================================
+ # -- Generate CMake toolchains -------------------------------------------------
+@@ -170,6 +171,7 @@ for PY_VERSION in ${PY_VERSION_LIST[@]} ; do
+     mv ${BOOST_PACKAGE_BASENAME} ${BOOST_BASENAME}-source
+ 
+     pushd ${BOOST_BASENAME}-source >/dev/null
++    patch -p1 --forward < "${HOME}/carla/patches/boost_numpy2_dtype.patch"
+ 
+     BOOST_TOOLSET="clang-10.0"
+     BOOST_CFLAGS="-fPIC -std=c++14 -DBOOST_ERROR_CODE_HEADER_ONLY"
+@@ -179,6 +181,10 @@ for PY_VERSION in ${PY_VERSION_LIST[@]} ; do
+     py3_include=$(${py3} -c "from sysconfig import get_paths as gp; print(gp()['include'])")
+     py3_lib=$(${py3} -c "from sysconfig import get_paths as gp; print(gp()['stdlib'])")
+     pyv=`$py3 -c "import sys;x='{v[0]}.{v[1]}'.format(v=list(sys.version_info[:2]));sys.stdout.write(x)";`
++    # Ubuntu 24.04 glibc uses RELR (.relr.dyn, type 0x13). The UE-bundled
++    # clang 10 ld cannot read it. bootstrap.sh wipes CXX/CXXFLAGS and does
++    # not forward LDFLAGS, so the gold flag has to be on build.sh itself.
++    sed -i 's|engine/build.sh" ${TOOLSET}|engine/build.sh" --cxxflags="-fuse-ld=gold" ${TOOLSET}|' bootstrap.sh
+     ./bootstrap.sh \
+         --with-toolset=clang \
+         --prefix=../boost-install \
+@@ -193,8 +199,8 @@ for PY_VERSION in ${PY_VERSION_LIST[@]} ; do
+         ${py3_include} : ${py3_lib} ;" > project-config.jam
+     fi
+ 
+-    ./b2 toolset="${BOOST_TOOLSET}" cxxflags="${BOOST_CFLAGS}" --prefix="../${BOOST_BASENAME}-install" -j ${CARLA_BUILD_CONCURRENCY} stage release
+-    ./b2 toolset="${BOOST_TOOLSET}" cxxflags="${BOOST_CFLAGS}" --prefix="../${BOOST_BASENAME}-install" -j ${CARLA_BUILD_CONCURRENCY} install
++    ./b2 toolset="${BOOST_TOOLSET}" cxxflags="${BOOST_CFLAGS}" linkflags="-fuse-ld=gold" --prefix="../${BOOST_BASENAME}-install" -j ${CARLA_BUILD_CONCURRENCY} stage release
++    ./b2 toolset="${BOOST_TOOLSET}" cxxflags="${BOOST_CFLAGS}" linkflags="-fuse-ld=gold" --prefix="../${BOOST_BASENAME}-install" -j ${CARLA_BUILD_CONCURRENCY} install
+ 
+     popd >/dev/null
+ 
+@@ -422,7 +428,7 @@ unset RECAST_BASENAME
+ # ==============================================================================
+ 
+ LIBPNG_VERSION=1.6.37
+-LIBPNG_REPO=https://sourceforge.net/projects/libpng/files/libpng16/${LIBPNG_VERSION}/libpng-${LIBPNG_VERSION}.tar.xz
++LIBPNG_REPO=https://sourceforge.net/projects/libpng/files/libpng16/older-releases/${LIBPNG_VERSION}/libpng-${LIBPNG_VERSION}.tar.xz
+ LIBPNG_BASENAME=libpng-${LIBPNG_VERSION}
+ LIBPNG_INSTALL=${LIBPNG_BASENAME}-install
+ 
+@@ -449,7 +455,8 @@ else
+ 
+   pushd ${LIBPNG_BASENAME}-source >/dev/null
+ 
+-  ./configure --prefix=${CARLA_BUILD_FOLDER}/${LIBPNG_INSTALL}
++  # This release's libtool drops -fuse-ld from LDFLAGS on shared links.
++  CC="${CC} -fuse-ld=gold" ./configure --prefix=${CARLA_BUILD_FOLDER}/${LIBPNG_INSTALL}
+   make install
+ 
+   popd >/dev/null
+@@ -474,10 +481,11 @@ XERCESC_INSTALL_SERVER_DIR=${XERCESC_BASENAME}-install-server
+ XERCESC_LIB=${XERCESC_INSTALL_DIR}/lib/libxerces-c.a
+ XERCESC_SERVER_LIB=${XERCESC_INSTALL_SERVER_DIR}/lib/libxerces-c.a
+ 
+-if [[ -d ${XERCESC_INSTALL_DIR} &&  -d ${XERCESC_INSTALL_SERVER_DIR} ]] ; then
++if [[ -f ${XERCESC_LIB} && -f ${XERCESC_SERVER_LIB} ]] ; then
+   log "Xerces-c already installed."
+ else
+   log "Retrieving xerces-c."
++  rm -Rf ${XERCESC_SRC_DIR} ${XERCESC_INSTALL_DIR} ${XERCESC_INSTALL_SERVER_DIR}
+   start=$(date +%s)
+   wget ${XERCESC_REPO}
+   end=$(date +%s)
+@@ -517,12 +525,13 @@ else
+ 
+   popd >/dev/null
+ 
+-  mkdir -p ${XERCESC_INSTALL_SERVER_DIR}
++  mkdir -p ${XERCESC_INSTALL_SERVER_DIR} ${XERCESC_SRC_DIR}/build-server
+ 
+-  pushd ${XERCESC_SRC_DIR}/build >/dev/null
++  pushd ${XERCESC_SRC_DIR}/build-server >/dev/null
+ 
+   cmake -G "Ninja" \
+-      -DCMAKE_CXX_FLAGS="-std=c++14 -stdlib=libc++ -fPIC -w -I${LLVM_INCLUDE} -L${LLVM_LIBPATH}" \
++      -DCMAKE_SYSROOT="${UNREAL_SYSROOT}" \
++      -DCMAKE_CXX_FLAGS="-std=c++14 -stdlib=libc++ -pthread -fPIC -w -I${LLVM_INCLUDE} -L${LLVM_LIBPATH}" \
+       -DCMAKE_INSTALL_PREFIX="../../${XERCESC_INSTALL_SERVER_DIR}" \
+       -DCMAKE_BUILD_TYPE=Release \
+       -DBUILD_SHARED_LIBS=OFF \
+@@ -655,11 +664,14 @@ SQLITE_LIB=${PWD}/${SQLITE_INSTALL_DIR}/lib/libsqlite3.a
+ SQLITE_FULL_LIB=${PWD}/${SQLITE_INSTALL_DIR}/lib/
+ SQLITE_EXE=${PWD}/${SQLITE_INSTALL_DIR}/bin/sqlite3
+ 
+-if [[ -d ${SQLITE_INSTALL_DIR} ]] ; then
++if [[ -f ${SQLITE_LIB} && -x ${SQLITE_EXE} ]] ; then
+   log "Sqlite already installed."
+ else
+   log "Retrieving Sqlite3"
+ 
++  # A failed configure/build can leave an empty install directory behind.
++  rm -Rf ${SQLITE_SOURCE_DIR} ${SQLITE_INSTALL_DIR}
++
+   start=$(date +%s)
+   wget ${SQLITE_REPO}
+   end=$(date +%s)
+@@ -679,7 +691,8 @@ else
+   pushd ${SQLITE_SOURCE_DIR} >/dev/null
+ 
+   export CFLAGS="-fPIC -w"
+-  ./configure --prefix=${PWD}/../sqlite-install/
++  # This release's libtool drops -fuse-ld from LDFLAGS on shared links.
++  CC="${CC} -fuse-ld=gold" ./configure --prefix=${PWD}/../sqlite-install/
+   make
+   make install
+ 
+@@ -711,11 +724,13 @@ PROJ_INSTALL_SERVER_DIR_FULL=${PWD}/${PROJ_INSTALL_SERVER_DIR}
+ PROJ_LIB=${PROJ_INSTALL_DIR_FULL}/lib/libproj.a
+ PROJ_SERVER_LIB=${PROJ_INSTALL_SERVER_DIR_FULL}/lib/libproj.a
+ 
+-if [[ -d ${PROJ_INSTALL_DIR} && -d ${PROJ_INSTALL_SERVER_DIR_FULL} ]] ; then
++if [[ -f ${PROJ_LIB} && -f ${PROJ_SERVER_LIB} ]] ; then
+   log "PROJ already installed."
+ else
+   log "Retrieving PROJ"
+ 
++  rm -Rf ${PROJ_SRC_DIR} ${PROJ_INSTALL_DIR} ${PROJ_INSTALL_SERVER_DIR}
++
+   start=$(date +%s)
+   wget ${PROJ_REPO}
+   end=$(date +%s)
+@@ -729,12 +744,17 @@ else
+ 
+   mv ${PROJ_VERSION} ${PROJ_SRC_DIR}
+ 
++  # PROJ 7.2.1 uses std::int64_t without including its defining header.
++  # Newer libstdc++ no longer provides it through vector/string.
++  sed -i '/^#include <vector>$/i #include <cstdint>' ${PROJ_SRC_DIR}/src/proj_json_streaming_writer.hpp
++
+   mkdir -p ${PROJ_SRC_DIR}/build
+   mkdir -p ${PROJ_INSTALL_DIR}
+ 
+   pushd ${PROJ_SRC_DIR}/build >/dev/null
+ 
+   cmake -G "Ninja" .. \
++      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+       -DCMAKE_CXX_FLAGS="-std=c++14 -fPIC" \
+       -DSQLITE3_INCLUDE_DIR=${SQLITE_INCLUDE_DIR} -DSQLITE3_LIBRARY=${SQLITE_LIB} \
+       -DEXE_SQLITE3=${SQLITE_EXE} \
+@@ -748,12 +768,14 @@ else
+ 
+   popd >/dev/null
+ 
+-  mkdir -p ${PROJ_INSTALL_SERVER_DIR}
++  mkdir -p ${PROJ_INSTALL_SERVER_DIR} ${PROJ_SRC_DIR}/build-server
+ 
+-  pushd ${PROJ_SRC_DIR}/build >/dev/null
++  pushd ${PROJ_SRC_DIR}/build-server >/dev/null
+ 
+   cmake -G "Ninja" .. \
+-      -DCMAKE_CXX_FLAGS="-std=c++14 -fPIC -stdlib=libc++ -I${LLVM_INCLUDE} -Wl,-L${LLVM_LIBPATH}"  \
++      -DCMAKE_SYSROOT="${UNREAL_SYSROOT}" \
++      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
++      -DCMAKE_CXX_FLAGS="-std=c++14 -fPIC -stdlib=libc++ -pthread -I${LLVM_INCLUDE} -Wl,-L${LLVM_LIBPATH}"  \
+       -DSQLITE3_INCLUDE_DIR=${SQLITE_INCLUDE_DIR} -DSQLITE3_LIBRARY=${SQLITE_LIB} \
+       -DEXE_SQLITE3=${SQLITE_EXE} \
+       -DENABLE_TIFF=OFF -DENABLE_CURL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_PROJSYNC=OFF \
