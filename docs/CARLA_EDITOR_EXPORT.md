@@ -303,3 +303,136 @@ password, so the click was `XTestFakeButtonEvent` from `libXtst` at the
 **No** button (root 684, 380). The window is gone (`xwininfo` shows no
 children on the root). Pids 348692 and 348889 exited with the dialog.
 No kill signal was sent.
+
+## Boost.NumPy decision — 2026-09-25 04:45 UTC
+
+**Where this ran:** a separate cloud container, not the machine with
+`~/carla`, UE 4.26, and display `:99`. That machine was not reachable
+from here, so **`make setup` and `make launch` were not re-run and `:99`
+was not captured.** Everything below is from the upstream `0.9.16`
+source (shallow clone of `carla-simulator/carla` at tag `0.9.16`),
+Boost 1.84.0 (GitHub release tarball, since `archives.boost.io` is
+blocked by this container's proxy) and `numpy==2.4.6` in a venv.
+
+### Does anything for `make launch` link `libboost_numpy`? — **No**
+
+- No `*.Build.cs` or `*.Target.cs` under `Unreal/` mentions numpy.
+- `Carla.Build.cs` and `CarlaTools.Build.cs` link Boost libraries only
+  on Windows (`AddBoostLibs` globs `*boost*.lib`, lines 172–196). The
+  Linux branch (lines 227+) links `rpc`, `carla_server`, and optionally
+  Chrono and libtorch. It links no Boost library at all. The plugin
+  uses Boost headers only.
+- `LibCarla/cmake/server/CMakeLists.txt` installs Boost headers, plus
+  Boost libs only `if(WIN32)`.
+- The compiled Boost libs from `Setup.sh` go only to
+  `LIBCARLA_INSTALL_CLIENT_FOLDER` (lines 207–208). That is the
+  PythonAPI side.
+- Even the client does not need it: `PythonAPI/carla/setup.py` links
+  `boost_python3X` only, and there are no numpy hits in
+  `PythonAPI/carla/source` or `LibCarla/source/carla/PythonUtil.h`.
+
+### Why an explicit library list does not drop numpy
+
+- `bootstrap.sh` already gets `--with-libraries=python,filesystem,system,program_options`.
+- numpy is not a separate Boost library. It is a sub-target of
+  `python`. In `libs/python/build/Jamfile`, `boost_numpy` has
+  `[ unless [ python.numpy ] : <build>no ]`. `python.jam` sets
+  `.numpy = true` when the configured interpreter can
+  `import numpy`. No `--with-*` or `--without-*` flag controls this.
+- Side finding: `Setup.sh` overwrites `project-config.jam` (line 193)
+  with only the `using python ...` line. That throws away the
+  `libraries = --with-...` line that bootstrap wrote, so the two `./b2`
+  lines build all of Boost (about 2469 targets here). Adding
+  `--with-python --with-filesystem --with-system --with-program_options`
+  to the b2 lines would restore the intended set. numpy would still
+  build, because it comes with `python`.
+- The only way to "exclude" it is to hide numpy from the interpreter.
+  For example, `PYTHONNOUSERSITE=1` on the b2 lines would hide the
+  2.4.6 in `~/.local`. That depends on what else is installed
+  system-wide, and it is the "messy" case. **Went with step 3 (patch)
+  instead.**
+
+### Patch — one line in `libs/python/src/numpy/dtype.cpp`
+
+Reproduced here: compiling all six `libs/python/src/numpy/*.cpp`
+against NumPy 2.4.6 headers gives exactly one error, the same one as
+`make_setup_gold.log`:
+
+```
+dtype.cpp:101:83: error: no member named 'elsize' in '_PyArray_Descr'
+```
+
+`matrix`, `ndarray`, `numpy`, `scalars`, and `ufunc` compile clean.
+
+The accessor in 2.4.6 is `PyDataType_ELSIZE(const PyArray_Descr *)`.
+It is not in `ndarraytypes.h`. It is a static inline in
+`numpy/_core/include/numpy/npy_2_compat.h:209`
+(`DESCR_ACCESSOR(ELSIZE, elsize, npy_intp, 0)`), which `ndarrayobject.h`
+already includes. The `#if` keeps it building against NumPy 1.x.
+
+`~/carla/patches/boost_numpy2_dtype.patch`:
+
+```diff
+--- a/libs/python/src/numpy/dtype.cpp
++++ b/libs/python/src/numpy/dtype.cpp
+@@ -98,7 +98,13 @@
+   return python::detail::new_reference(reinterpret_cast<PyObject*>(obj));
+ }
+ 
+-int dtype::get_itemsize() const { return reinterpret_cast<PyArray_Descr*>(ptr())->elsize;}
++int dtype::get_itemsize() const {
++#if NPY_ABI_VERSION < 0x02000000
++  return reinterpret_cast<PyArray_Descr*>(ptr())->elsize;
++#else
++  return PyDataType_ELSIZE(reinterpret_cast<PyArray_Descr*>(ptr()));
++#endif
++}
+ 
+ bool equivalent(dtype const & a, dtype const & b) {
+     // On Windows x64, the behaviour described on 
+```
+
+(The context line ending in `on ` has a trailing space in the Boost
+source. Keep it if the patch is copied from this page.)
+
+`Setup.sh` deletes the Boost source after each build and re-extracts
+it, so the patch has to be applied inside `Setup.sh`. Put it right
+after the `pushd`, next to the gold `sed`:
+
+```
+sed -i 's|^\(    pushd ${BOOST_BASENAME}-source >/dev/null\)$|\1\n    patch -p1 --forward < "${HOME}/carla/patches/boost_numpy2_dtype.patch"|' \
+  ~/carla/carla-0.9.16-src/Util/BuildTools/Setup.sh
+```
+
+Checked on a copy of the stock 0.9.16 `Setup.sh`: this adds one line
+after line 172, and `bash -n` passes. The patch applies cleanly to
+pristine 1.84.0. A second apply is refused ("previously applied"),
+which is expected on already-patched source.
+
+### Verification here
+
+- Bootstrap plus `./b2 ... stage release` with the patched source,
+  `clang` 18, and `numpy 2.4.6` / Python 3.11: **exit 0**,
+  `...updated 2469 targets...`, no failed targets.
+  `libboost_numpy311.{a,so}` and `libboost_python311.{a,so}` were
+  produced.
+- A test extension calling `np::dtype(o).get_itemsize()` returned the
+  same value as `dtype.itemsize` for float64 (8), int32 (4), uint8 (1),
+  complex128 (16), `S7` (7), and structured `[('a','f4'),('b','i8')]`
+  (12), plus `np::zeros(...).get_dtype().get_itemsize()` for float64
+  (8).
+- Not verified: UE's bundled clang (clang-10 toolset) with the gold
+  link flags, and Python 3.12. Neither is present here. The change uses
+  only a NumPy header function, so neither should matter.
+
+### Still to run on the CARLA machine
+
+1. Save the patch, apply the `sed` above, then `make setup`. Check the
+   exit code and that the b2 summary has no `failed updating` line.
+   Then check that `Setup.sh` gets past Boost to rpclib.
+2. `make launch` with `DISPLAY=:99` and
+   `UE4_ROOT=/home/soham/UnrealEngine_4.26`.
+3. Capture `:99` with the same method as section 6. Exit 0 alone does
+   not show the Editor is up.
+
+NumPy was not pinned or changed on any machine.
