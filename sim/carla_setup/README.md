@@ -26,6 +26,11 @@ Prerequisites are the installed, built CARLA Unreal Engine 4.26 at commit
 version `20250912_2171890`. Content belongs at
 `Unreal/CarlaUE4/Content/Carla`; a symlink to that existing asset installation
 is sufficient. Launch requires a working X display and Vulkan driver.
+If `:99` is stopped, start it before launching:
+
+```sh
+Xvfb :99 -screen 0 1280x1024x24 -ac -nolisten tcp > /tmp/carla-xvfb.log 2>&1 &
+```
 
 On a fresh CARLA source checkout at
 `294096eb1c38eabf246e4f3a9cdab704e33a7f4c`:

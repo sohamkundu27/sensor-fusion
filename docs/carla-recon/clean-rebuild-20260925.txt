@@ -1,0 +1,72 @@
+Clean CARLA rebuild verification — 2026-09-25
+
+Fix bundle: d15ecb9976d0239525bbb0db6f334fe808fcd83a, cloned from origin/main.
+Source: /home/soham/carla/repro-20260925/carla
+Commands (from the remote fix checkout):
+  sim/carla_setup/build.sh /home/soham/carla/repro-20260925/carla setup
+  sim/carla_setup/build.sh /home/soham/carla/repro-20260925/carla launch
+build.sh clears the environment and uses bash --noprofile --norc.
+
+Preflight (pristine source; empty git status; generated paths absent):
+2026-09-25T15:05:38Z
+d15ecb9976d0239525bbb0db6f334fe808fcd83a
+294096eb1c38eabf246e4f3a9cdab704e33a7f4c
+absent before build: Build
+absent before build: Unreal/CarlaUE4/Binaries
+absent before build: Unreal/CarlaUE4/Intermediate
+absent before build: Unreal/CarlaUE4/Plugins/Carla/CarlaDependencies
+absent before build: Unreal/CarlaUE4/Plugins/Carla/Binaries
+e9d9e60c85f643e10eeb03f42f61554d18dcb30f
+20250912_2171890
+d081cae79252ba361cc0454eb8b93039afe23c491d00a425c15591e36a7f5f65  /home/soham/carla/repro-20260925/fix-checkout/sim/carla_setup/boost_numpy2_dtype.patch
+
+Reused prerequisites: installed UE4.26 engine, host tools, Python/NumPy,
+official content 20250912_2171890 (symlink), vendor downloads and asset caches.
+No CARLA Build/, CarlaDependencies, project/plugin binaries or intermediates
+were copied from the earlier working tree. Engine git status remained clean.
+Original CARLA's three script edits match the committed combined patch exactly;
+its only additional untracked file is generated Unreal/CarlaUE4/.ignore.
+
+Fresh setup:
+start_utc=2026-09-25T15:05:40Z
+end_utc=2026-09-25T15:09:04Z
+make_exit=0
+elapsed_sec=204.14
+command_exit=0
+Boost failed-updating lines: 0
+Boost summaries: updated 278 targets; updated 17044 targets.
+rpclib libc++ and libstdc++ builds completed; Setup.sh: Success!
+
+Fresh launch rebuilt LibCarla, OSM2ODR, project and plugins, and opened UE4Editor
+PID 901999 against the verification checkout. Town10HD_Opt loaded with 4,013
+actors; MapCheck reported 0 errors, 0 warnings. Startup/compiler warnings remain.
+xwd -display :99 -root captures were converted to PNG and visually inspected.
+Mouse interaction opened File; keyboard G toggled viewport guides and Escape
+cleared selection/closed the menu. No exporter action or map save was performed.
+Screenshot committed: display99-clean-rebuild-20260925.png.
+
+Shutdown qualification: the first launch tool session returned 143 (SIGTERM)
+and did not record a normal shutdown. Its cause was not established. It is not
+counted as a clean exit. Relaunched the same rebuilt checkout in a detached
+supervisor, inspected the real editor again, and clicked its Close button.
+The repeat ended with LogExit: Exiting and LogInit: Tearing down SDL:
+start_utc=2026-09-25T15:17:06Z
+end_utc=2026-09-25T15:18:22Z
+make_exit=0
+elapsed_sec=75.89
+command_exit=0
+
+The original editor also closed normally before the clean build (launch exit 0).
+No kill -9 was used. Xvfb :99 received SIGTERM only after its clients were gone.
+Final ps/pgrep checks: no CARLA/Unreal, shader workers, build tools or Xvfb remain.
+The verification checkout and logs are retained; no build is running.
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p2  915G  806G   63G  93% /
+
+Detailed local logs under ~/carla/logs/:
+  make_setup_clean_repro_20260925.log (+ .status and .time)
+  make_launch_clean_repro_20260925.log
+  clean_repro_editor_first_20260925.log
+  make_launch_clean_repro_shutdown_20260925.log (+ .status and .time)
+  display99-clean-rebuild-20260925.xwd
+  display99-clean-rebuild-interaction-20260925.png

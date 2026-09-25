@@ -556,3 +556,21 @@ checks pass. The bundled NumPy patch remains byte-for-byte identical.
 Logs: `~/carla/logs/make_setup_server_threads_20260925.log` and
 `~/carla/logs/make_launch_server_sysroot_20260925.log`.
 Raw capture: `~/carla/logs/display99-editor-working-20260925.xwd`.
+
+## Status as of 2026-09-25, paused ~1 week
+
+Confirmed: the editor **builds and runs from a clean CARLA checkout**, using
+the committed fixes (`d15ecb9`), installed UE4.26, and official CARLA content.
+No CARLA dependency libraries or project binaries were copied into the test.
+Fresh-shell `make setup` exited **0** in 204.14 s, with no Boost `failed updating`
+lines; `make launch` rebuilt the project and opened interactive Town10HD_Opt.
+The [inspected :99 capture](carla-recon/display99-clean-rebuild-20260925.png)
+shows the city, editor panels, and 4,013 actors. Mouse/keyboard checks passed.
+[Verification record](carla-recon/clean-rebuild-20260925.txt) includes the clean
+shutdown rerun: `make launch` exited **0**. No CARLA/Unreal/build processes remain.
+Xvfb `:99` was stopped because no unattended display is needed; disk has **63 GiB
+available**. The tested checkout is retained at `~/carla/repro-20260925/carla`.
+
+Next when work resumes: run the **Carla Exporter** menu action to produce a
+`.obj`, then load it into **Mitsuba**. No export was attempted; nothing else
+is pending from this session.
