@@ -20,22 +20,34 @@ The build-script patch fixes:
   preventing references to glibc 2.38+ C23 symbols unavailable in UE's sysroot.
 - Detection and cleanup of incomplete SQLite/Xerces/PROJ installations on retry.
 
-On a fresh, unmodified CARLA 0.9.16 source tree at the same location:
+Prerequisites are the installed, built CARLA Unreal Engine 4.26 at commit
+`e9d9e60c85f643e10eeb03f42f61554d18dcb30f`, the host development tools
+(including GNU gold), Python 3.12 with NumPy 2.4.6, and official CARLA content
+version `20250912_2171890`. Content belongs at
+`Unreal/CarlaUE4/Content/Carla`; a symlink to that existing asset installation
+is sufficient. Launch requires a working X display and Vulkan driver.
+
+On a fresh CARLA source checkout at
+`294096eb1c38eabf246e4f3a9cdab704e33a7f4c`:
 
 ```sh
-mkdir -p ~/carla/patches
-cp /home/soham/sensor-fusion/sim/carla_setup/boost_numpy2_dtype.patch ~/carla/patches/
-cd ~/carla/carla-0.9.16-src
-git apply --check /home/soham/sensor-fusion/sim/carla_setup/carla-0.9.16-ubuntu24.patch
-git apply /home/soham/sensor-fusion/sim/carla_setup/carla-0.9.16-ubuntu24.patch
 export UE4_ROOT=/home/soham/UnrealEngine_4.26
 export DISPLAY=:99
-make setup
-make launch
+./sim/carla_setup/build.sh ~/carla/carla-0.9.16-src setup
+./sim/carla_setup/build.sh ~/carla/carla-0.9.16-src launch
 ```
 
-The live tree is already patched. Do not apply the combined patch again.
-The patch preserves dependency versions and the previously validated NumPy fix.
+`apply.sh` checks the CARLA revision, applies the saved script patch (or verifies
+it is already applied), and installs the exact NumPy patch at the path used by
+Setup.sh. `build.sh` runs `make` in a fresh shell with a cleared environment;
+compiler/linker flags come from the committed patch. The patch preserves
+dependency versions and the previously validated NumPy fix.
+
+For a clean reproduction, use a separate source checkout with no `Build/`,
+project/plugin binaries, intermediates, or `CarlaDependencies/` copied in.
+Reuse only the installed engine, official content, and host tools above.
+This tests a clean CARLA build, not a new OS or an engine rebuild. Shader/asset
+caches may be reused; they do not supply CARLA libraries or project binaries.
 
 Capture the editor using the locally extracted ImageMagick tool:
 
